@@ -8,6 +8,7 @@
 #include <ranges>
 #include <functional>
 #include <concepts>
+#include <algorithm>
 namespace std {
     template <class T, size_t N>
     struct hash<array<T, N>> {
@@ -29,7 +30,7 @@ namespace std {
 // enables one level of nested deduplication.
 
 /// @brief Deduplicated fixed-size associative container.
-template <std::integral Key, typename T, std::size_t BlockSize = 8>
+template <typename Key, typename T, std::size_t BlockSize = 8>
 class flyweight_block_map {
 public:
     /// @brief key type used to access elements.
@@ -62,32 +63,86 @@ private:
         return *ptr;
     }
 
-public:
-    /// @brief Construct default block with all values default-initialized.
-    flyweight_block_map() {
-        block_array arr{};
-        value_key def = value_pool_.insert(T{});
-        arr.fill(def);
-        block_ = block_pool_.insert(arr);
+    /// @brief Convert key type to index.
+    static constexpr std::size_t to_index(const key_type& key) {
+        if constexpr(std::integral<key_type>) {
+            return static_cast<std::size_t>(key);
+        } else {
+            return static_cast<std::size_t>(key.value);
+        }
     }
+
+public:
+    /// @brief Return handle of default value.
+    static value_key default_value_key() {
+        static const value_key key = value_pool_.insert(T{});
+        return key;
+    }
+
+    /// @brief Key for the default block of values.
+    static block_key default_block_key() {
+        static const block_key key = []{
+            block_array arr{};
+            arr.fill(default_value_key());
+            return block_pool_.insert(arr);
+        }();
+        return key;
+    }
+
+    /// @brief Construct default block with all values default-initialized.
+    flyweight_block_map() { block_ = default_block_key(); }
 
     /// @brief Get value at key.
     const T& at(const key_type& key) const {
-        auto idx = static_cast<std::size_t>(key);
+        auto idx = to_index(key);
         assert(idx < BlockSize);
         const auto& arr = get_block(block_);
         return get_value(arr[idx]);
     }
 
+    /// @brief Proxy reference to a stored value.
+    class reference {
+    public:
+        /// @brief Construct from parent and key.
+        reference(flyweight_block_map& parent, key_type key) noexcept
+            : parent_(&parent), key_(key) {}
+
+        /// @brief Convert to const reference.
+        operator const T&() const { return parent_->at(key_); }
+
+        /// @brief Assign through proxy.
+        reference& operator=(const T& val) {
+            parent_->set(key_, val);
+            return *this;
+        }
+
+    private:
+        flyweight_block_map* parent_{nullptr};
+        key_type key_{};
+    };
+
+    /// @brief Indexed mutable access.
+    reference operator[](const key_type& key) { return reference(*this, key); }
+
     /// @brief Indexed read-only access.
     const T& operator[](const key_type& key) const { return at(key); }
 
-    /// @brief Number of elements in the block.
-    static constexpr size_type size() noexcept { return BlockSize; }
+    /// @brief Count of non-default values.
+    size_type size() const {
+        auto def = default_value_key();
+        const auto& arr = get_block(block_);
+        return std::ranges::count_if(arr, [def](value_key k){ return k != def; });
+    }
+
+    /// @brief True if all values are default.
+    bool empty() const noexcept { return block_ == default_block_key(); }
+
+    /// @brief Reset to default values.
+    void clear() noexcept { block_ = default_block_key(); }
 
     /// @brief Assign value at key.
     void set(const key_type& key, const T& val) {
-        auto idx = static_cast<std::size_t>(key);
+        auto idx = to_index(key);
         assert(idx < BlockSize);
         auto arr = get_block(block_);
         arr[idx] = value_pool_.insert(val);
@@ -96,6 +151,52 @@ public:
 
     /// @brief Retrieve internal deduplication key.
     block_key key() const noexcept { return block_; }
+
+
+    /// @brief Forward iterator over mutable values.
+class iterator {
+    public:
+        friend class flyweight_block_map;
+        using iterator_category = std::forward_iterator_tag;
+        using iterator_concept  = std::forward_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = flyweight_block_map::value_type;
+        using reference         = std::pair<key_type, flyweight_block_map::reference>;
+        using pointer           = arrow_proxy<reference>;
+
+        /// @brief Default constructed iterator.
+        iterator() = default;
+        /// @brief Construct from parent and starting index.
+        iterator(flyweight_block_map* parent, std::size_t idx)
+            : parent_(parent), index_(idx) {}
+
+        /// @brief Dereference to key/value pair.
+        reference operator*() const {
+            return { static_cast<key_type>(index_),
+                     flyweight_block_map::reference{*parent_, static_cast<key_type>(index_)} };
+        }
+
+        /// @brief Arrow operator for structured bindings.
+        pointer operator->() const { return pointer{ **this }; }
+
+        /// @brief Advance to next element.
+        iterator& operator++() { ++index_; return *this; }
+        /// @brief Post-increment.
+        iterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
+
+        /// @brief Equality comparison.
+        bool operator==(const iterator& o) const {
+            return parent_ == o.parent_ && index_ == o.index_;
+        }
+        /// @brief Inequality comparison.
+        bool operator!=(const iterator& o) const { return !(*this == o); }
+
+    private:
+        flyweight_block_map* parent_{nullptr};
+        std::size_t index_{0};
+    };
+
+    /// @brief Read-only forward iterator.
     class const_iterator {
     public:
         using iterator_category = std::forward_iterator_tag;
@@ -136,14 +237,59 @@ public:
         std::size_t index_{0};
     };
 
+    /// @brief Iterator to value by key, or end().
+    iterator find(const key_type& key) {
+        auto idx = to_index(key);
+        assert(idx < BlockSize);
+        const auto& arr = get_block(block_);
+        if (arr[idx] == default_value_key()) return end();
+        return iterator(this, idx);
+    }
+
+    /// @brief Const iterator to value by key.
+    const_iterator find(const key_type& key) const {
+        auto idx = to_index(key);
+        assert(idx < BlockSize);
+        const auto& arr = get_block(block_);
+        if (arr[idx] == default_value_key()) return end();
+        return const_iterator(this, idx);
+    }
+
+    /// @brief Erase value at key if present.
+    size_type erase(const key_type& key) {
+        auto idx = to_index(key);
+        assert(idx < BlockSize);
+        auto arr = get_block(block_);
+        if (arr[idx] == default_value_key()) return 0;
+        arr[idx] = default_value_key();
+        block_ = block_pool_.insert(arr);
+        return 1;
+    }
+
+    /// @brief Erase value at iterator and return next.
+    iterator erase(iterator pos) {
+        auto idx = pos.index_;
+        erase(static_cast<key_type>(idx));
+        return iterator(this, idx);
+    }
+
     /// @brief Iterator to first element.
-    const_iterator begin() const noexcept { return const_iterator(this, 0); }
+    iterator begin() noexcept { return iterator(this, 0); }
     /// @brief Iterator past the last element.
+    iterator end() noexcept { return iterator(this, BlockSize); }
+
+    /// @brief Const iterator to first element.
+    const_iterator begin() const noexcept { return const_iterator(this, 0); }
+    /// @brief Const iterator past the last element.
     const_iterator end() const noexcept { return const_iterator(this, BlockSize); }
 
     /// @brief Begin iterator ADL helper.
-    friend const_iterator begin(const flyweight_block_map& b) noexcept { return b.begin(); }
+    friend iterator begin(flyweight_block_map& b) noexcept { return b.begin(); }
     /// @brief End iterator ADL helper.
+    friend iterator end(flyweight_block_map& b) noexcept { return b.end(); }
+    /// @brief Const begin iterator ADL helper.
+    friend const_iterator begin(const flyweight_block_map& b) noexcept { return b.begin(); }
+    /// @brief Const end iterator ADL helper.
     friend const_iterator end(const flyweight_block_map& b) noexcept { return b.end(); }
 
 private:
