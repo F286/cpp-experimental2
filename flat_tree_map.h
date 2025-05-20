@@ -62,8 +62,8 @@ public:
         using iterator_category = std::forward_iterator_tag;
         using value_type        = std::pair<std::size_t, bool>;
         using difference_type   = std::ptrdiff_t;
-        using pointer           = void;
         using reference         = value_type;
+        using pointer           = arrow_proxy<reference>;
 
         iterator() : map_(nullptr), index_(0) {}
         iterator(const flat_tree_map *m, std::size_t idx) : map_(m), index_(idx) {}
@@ -72,6 +72,7 @@ public:
         value_type operator*() const {
             return {index_, true};
         }
+        pointer operator->() const { return pointer{**this}; }
         // Prefix increment: advance to next set bit
         iterator &operator++() {
             if(map_ && index_ < map_->m_capacity) {
