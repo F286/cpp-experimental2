@@ -54,3 +54,10 @@ TEST_CASE("iterate indices") {
     CHECK(vals == expect);
 }
 
+
+TEST_CASE("mutable access via operator[]") {
+    flyweight_block_map<std::size_t, int> b;
+    auto r = b[2];
+    r = 5;
+    CHECK(static_cast<int>(b[2]) == 5);
+}

@@ -103,17 +103,19 @@ public:
      * If the chunk or local entry does not exist, it will be created.
      * (Like std::map::operator[], inserts default T() if missing.)
      */
-    T& operator[](const GlobalPosition& gp) {
+    /// @brief Access element, creating chunk/local entry if needed.
+    decltype(auto) operator[](const GlobalPosition& gp) {
         auto [cp, lp] = split(gp);
-        InnerMap& inner = chunks_[cp];  // create chunk if needed
-        return inner[lp];              // create local element if needed
+        InnerMap& inner = chunks_[cp];
+        return inner[lp];
     }
 
     /**
      * Access element at GlobalPosition, throwing if it does not exist.
      * (Like std::map::at().) 
      */
-    T& at(const GlobalPosition& gp) {
+    /// @brief Access existing element or throw.
+    decltype(auto) at(const GlobalPosition& gp) {
         auto [cp, lp] = split(gp);
         auto itChunk = chunks_.find(cp);
         if (itChunk == chunks_.end())
@@ -124,7 +126,7 @@ public:
         return itLocal->second;
     }
     /** const overload of at() */
-    const T& at(const GlobalPosition& gp) const {
+    decltype(auto) at(const GlobalPosition& gp) const {
         auto [cp, lp] = split(gp);
         auto itChunk = chunks_.find(cp);
         if (itChunk == chunks_.end())
@@ -213,14 +215,14 @@ private:
     }
 
 public:
-    // Forward iterator over all (GlobalPosition, T) pairs.
+    /// @brief Forward iterator over all (GlobalPosition, value) pairs.
     class iterator {
     public:
         using difference_type = std::ptrdiff_t;
-        // We yield a pair<GlobalPosition, T&> on dereference
-        using value_type = std::pair<GlobalPosition, T>;
-        using reference  = std::pair<GlobalPosition, T&>;
-        using pointer           = arrow_proxy<reference>;
+        using inner_reference = decltype(std::declval<typename InnerMap::iterator::reference>().second);
+        using value_type = std::pair<GlobalPosition, std::remove_cvref_t<inner_reference>>;
+        using reference  = std::pair<GlobalPosition, inner_reference>;
+        using pointer    = arrow_proxy<reference>;
         using iterator_category = std::forward_iterator_tag;
 
         iterator() = default;
@@ -229,7 +231,7 @@ public:
                  typename InnerMap::iterator innerIt)
             : parent_(parent), outerIt_(outerIt), innerIt_(innerIt) {}
 
-        // Dereference returns (GlobalPosition, T&) pair by value
+        /// @brief Dereference to key/value pair.
         reference operator*() const {
             GlobalPosition gp = parent_->combine(outerIt_->first, innerIt_->first);
             return { gp, innerIt_->second };
@@ -267,13 +269,14 @@ public:
         typename InnerMap::iterator innerIt_;
     };
 
-    // const_iterator (similar to iterator but over const maps)
+    /// @brief const iterator over all (GlobalPosition, value) pairs.
     class const_iterator {
     public:
         using difference_type = std::ptrdiff_t;
-        using value_type = std::pair<GlobalPosition, T>;
-        using reference  = std::pair<GlobalPosition, const T&>;
-        using pointer           = arrow_proxy<reference>;
+        using inner_reference = decltype(std::declval<typename InnerMap::const_iterator::reference>().second);
+        using value_type = std::pair<GlobalPosition, std::remove_cvref_t<inner_reference>>;
+        using reference  = std::pair<GlobalPosition, inner_reference>;
+        using pointer    = arrow_proxy<reference>;
         using iterator_category = std::forward_iterator_tag;
 
         const_iterator() = default;

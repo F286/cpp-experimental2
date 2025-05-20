@@ -43,12 +43,13 @@ public:
     using size_type = std::size_t;
 
     flyweight_map() {
-        assert(instance_ == nullptr && "Only one flyweight_map instance per type allowed.");
-        instance_ = this;
+        if (!instance_)
+            instance_ = this;
     }
 
     ~flyweight_map() {
-        instance_ = nullptr;
+        if (instance_ == this)
+            instance_ = nullptr;
     }
 
     flyweight_map(const flyweight_map&) = delete;
