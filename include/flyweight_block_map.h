@@ -9,6 +9,9 @@
 #include <functional>
 #include <concepts>
 #include <algorithm>
+
+template<typename Map>
+class flyweight_block_map_blocks_view;
 namespace std {
     template <class T, size_t N>
     struct hash<array<T, N>> {
@@ -41,13 +44,28 @@ public:
     using value_type   = std::pair<const key_type, T>;
     /// @brief size type of the container.
     using size_type    = std::size_t;
+    static constexpr size_type block_size = BlockSize;
+
+    template<typename Map>
+    friend class flyweight_block_map_blocks_view;
+
+    /// @brief flyweight_map storing individual values.
+    using value_pool_t = flyweight_map<T>;
+    /// @brief Key type for stored values.
+    using value_key    = typename value_pool_t::key_type;
+    /// @brief Array of value handles comprising a block.
+    using block_array  = std::array<value_key, BlockSize>;
+    /// @brief flyweight_map storing unique blocks.
+    using block_pool_t = flyweight_map<block_array>;
+    /// @brief Key type for stored blocks.
+    using block_key    = typename block_pool_t::key_type;
+
+    /// @brief View over deduplicated blocks.
+    using blocks_view  = flyweight_block_map_blocks_view<flyweight_block_map>;
+    /// @brief Access deduplicated blocks.
+    static blocks_view blocks() noexcept { return {}; }
 
 private:
-    using value_pool_t = flyweight_map<T>;
-    using value_key    = typename value_pool_t::key_type;
-    using block_array  = std::array<value_key, BlockSize>;
-    using block_pool_t = flyweight_map<block_array>;
-    using block_key    = typename block_pool_t::key_type;
 
     /// @brief Retrieve block array for key.
     static const block_array& get_block(block_key k) {
@@ -296,5 +314,46 @@ private:
     inline static value_pool_t value_pool_{};
     inline static block_pool_t block_pool_{};
     block_key block_{};
+};
+
+/// @brief View object exposing deduplicated blocks for a flyweight_block_map.
+template<typename Map>
+class flyweight_block_map_blocks_view {
+public:
+    using map_type    = Map;
+    using block_array = typename map_type::block_array;
+    using value_key   = typename map_type::value_key;
+    using block_key   = typename map_type::block_key;
+    using iterator    = typename map_type::block_pool_t::const_iterator;
+    using size_type   = typename map_type::block_pool_t::size_type;
+
+    /// @brief First block iterator.
+    iterator begin() const noexcept { return map_type::block_pool_.begin(); }
+    /// @brief Past-the-end block iterator.
+    iterator end() const noexcept { return map_type::block_pool_.end(); }
+
+    /// @brief Begin iterator ADL helper.
+    friend iterator begin(const flyweight_block_map_blocks_view& v) noexcept { return v.begin(); }
+    /// @brief End iterator ADL helper.
+    friend iterator end(const flyweight_block_map_blocks_view& v) noexcept { return v.end(); }
+
+    /// @brief Retrieve block by key.
+    const block_array& at(block_key k) const { return map_type::get_block(k); }
+    /// @brief Retrieve block for map instance.
+    const block_array& at(const map_type& m) const { return map_type::get_block(m.block_); }
+    /// @brief Insert a block and return its key.
+    block_key insert(const block_array& arr) const { return map_type::block_pool_.insert(arr); }
+    /// @brief Insert a value and return its key.
+    value_key insert_value(const typename map_type::mapped_type& v) const { return map_type::value_pool_.insert(v); }
+    /// @brief Access stored value by handle.
+    const typename map_type::mapped_type& value_data(value_key k) const { return map_type::get_value(k); }
+    /// @brief Number of unique blocks.
+    size_type size() const noexcept { return map_type::block_pool_.size(); }
+    /// @brief Check for existence of block key.
+    bool contains(block_key k) const noexcept { return map_type::block_pool_.contains(k); }
+
+private:
+    flyweight_block_map_blocks_view() = default;
+    friend map_type;
 };
 
