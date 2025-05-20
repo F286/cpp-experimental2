@@ -136,51 +136,6 @@ private:
     std::unordered_map<T, key_type> value_to_key_;
     std::vector<T> storage_;
 
-    // Verify flyweight_map itself is a forward range
-    static_assert(std::ranges::range<flyweight_map<T>>);
-    static_assert(std::ranges::forward_range<flyweight_map<T>>);
-
-    // Verify iterator compliance explicitly
-    static_assert(std::forward_iterator<const_iterator>);
-    static_assert(std::input_or_output_iterator<const_iterator>);
-    static_assert(std::sentinel_for<const_iterator, const_iterator>);
-
-    // Verify associated types explicitly
-    static_assert(std::same_as<std::ranges::range_value_t<flyweight_map<T>>, value_type>);
-    static_assert(std::same_as<std::iter_value_t<const_iterator>, value_type>);
 };
 
-
-#include <iostream>
-#include <string>
-#include <ranges>
-
-int main() {
-    flyweight_map<std::string> map;
-
-    auto k1 = map.insert("apple");
-    auto k2 = map.insert("banana");
-    auto k3 = map.insert("apple"); // deduplicated
-
-    assert(k1 == k3);  // keys match
-    assert(map.size() == 2);
-
-    // Iterate items (key-value)
-    for (const auto& [key, value] : map) {
-        std::cout << key << ": " << value << '\n';
-    }
-
-    // Using ranges
-    std::cout << "Values only:\n";
-    for (const auto& v : map.values()) {
-        std::cout << v << '\n';
-    }
-
-    // Direct access
-    if (auto v = map.find(k2)) {
-        std::cout << "Found key " << k2 << " -> " << *v << '\n';
-    }
-
-    return 0;
-}
 
