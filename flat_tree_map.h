@@ -1,3 +1,5 @@
+#pragma once
+
 // ──────────────────────────────────────────────────────────────────────────
 //  flat_tree_map<size_t,bool>  – sparse bit-set presented as an ordered map
 //  (single specialisation of a conceptual flat_tree_map template family)
@@ -16,13 +18,7 @@
 #include <iostream>
 #include <vector>
 
-// Helper proxy that lets an iterator yield a prvalue *pair* yet still
-// offer operator-> (needed by some algorithms)
-template<class Ref>
-struct arrow_proxy {
-    Ref r;
-    Ref* operator->() { return &r; }
-};
+#include "arrow_proxy.h"
 
 // ──────────────────────────────────────────────────────────────────────────
 //  Primary template (empty – we only implement the requested specialisation)
