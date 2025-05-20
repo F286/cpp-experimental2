@@ -21,3 +21,8 @@ add_executable(test_flat_tree_map
     flat_tree_map.h
     arrow_proxy.h
 )
+
+add_executable(test_flyweight_map
+    test_flyweight_map.cpp
+    flyweight_map.h
+)
