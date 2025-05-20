@@ -25,13 +25,18 @@ namespace std {
     };
 }
 
-/// @brief Requirements for a mirror strategy operating on BlockArray.
-template <typename MirrorT, typename BlockArray>
-concept MirrorStrategy = requires(BlockArray b, std::size_t i,
-                                 typename MirrorT::orientation_type m) {
-    { MirrorT::apply(b, m) } -> std::same_as<BlockArray>;
-    { MirrorT::canonicalize(b) } -> std::same_as<std::pair<BlockArray, typename MirrorT::orientation_type>>;
-    { MirrorT::map_index(i, m) } -> std::same_as<std::size_t>;
+/// @brief Requirements for a mirror strategy operating on a block array.
+template <typename MirrorAlgorithm, typename BlockArrayType>
+concept MirrorStrategy = requires(BlockArrayType block,
+                                 std::size_t index,
+                                 typename MirrorAlgorithm::orientation_type orientation) {
+    /// @brief applying the orientation must yield a transformed block array
+    { MirrorAlgorithm::apply(block, orientation) } -> std::same_as<BlockArrayType>;
+    /// @brief canonicalization must return a block and its orientation mask
+    { MirrorAlgorithm::canonicalize(block) } ->
+        std::same_as<std::pair<BlockArrayType, typename MirrorAlgorithm::orientation_type>>;
+    /// @brief mapping an index must produce its oriented position
+    { MirrorAlgorithm::map_index(index, orientation) } -> std::same_as<std::size_t>;
 };
 
 
