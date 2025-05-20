@@ -14,4 +14,10 @@ endif()
 add_executable(test_chunk_map
     test_chunk_map.cpp
     chunk_map.h
-) 
+)
+
+add_executable(test_flat_tree_map
+    test_flat_tree_map.cpp
+    flat_tree_map.h
+    arrow_proxy.h
+)

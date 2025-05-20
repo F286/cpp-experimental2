@@ -15,7 +15,6 @@
 #include <ranges>
 #include <algorithm>
 #include <cassert>
-#include <iostream>
 #include <vector>
 
 #include "arrow_proxy.h"
@@ -350,55 +349,3 @@ static_assert(std::ranges::forward_range<test_map>);
 static_assert(std::ranges::common_range<test_map>);
 static_assert(std::same_as<std::ranges::range_value_t<test_map>, std::pair<std::size_t,bool>>);
 
-#include <vector>
-
-// ──────────────────────────────────────────────────────────────────────────
-//  Quick runtime test (mirrors the earlier bitset demo)
-// ──────────────────────────────────────────────────────────────────────────
-int main(){
-    using flat_tree_map_test = flat_tree_map<std::size_t,bool>;
-    flat_tree_map_test s;
-
-    // initially empty
-    assert(s.empty() && s.size()==0);
-
-    // set a few bits
-    s.set(0);  s.set(7);  s.set(15);
-    assert(!s.empty() && s.size()==3);
-    assert(s[7]);
-
-    // count via ranges
-    auto const& cs = s;   // const view
-    std::size_t cnt = std::ranges::count_if(cs,
-        [](auto const& p){ return p.second; });
-    assert(cnt==3);
-
-    // test iterator ordering
-    std::vector<std::size_t> keys;
-    std::ranges::transform(cs,std::back_inserter(keys),
-                           [](auto const& p){ return p.first; });
-    std::vector<std::size_t> expected{0,7,15};
-    assert(keys==expected);
-
-    // flip/ reset
-    s.flip(1);  // set 1
-    s.reset(7); // clear 7
-    assert(s.size()==3);
-    assert(s[1] && !s[7]);
-
-    // set-operations demo with ranges::set_intersection
-    flat_tree_map_test t;
-    t.set(0); t.set(3); t.set(15);
-
-    std::vector<std::pair<std::size_t,bool>> out;
-    std::ranges::set_intersection(
-        cs, std::as_const(t),
-        std::back_inserter(out),
-        [](auto const& a,auto const& b){ return a.first < b.first; });
-
-    // out should contain (0,true) and (15,true)
-    assert(out.size()==2 && out[0].first==0 && out[1].first==15);
-
-    std::cout<<"All flat_tree_map tests passed.\n";
-    return 0;
-}
