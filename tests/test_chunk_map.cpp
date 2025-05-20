@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
 #include "chunk_map.h"
 #include <vector>
@@ -82,8 +81,3 @@ TEST_CASE("set_intersection on full pairs") {
     CHECK(inter[1].first == GlobalPosition{45});
 }
 
-int main(int argc, char** argv) {
-    doctest::Context context;
-    context.applyCommandLine(argc, argv);
-    return context.run();
-}
