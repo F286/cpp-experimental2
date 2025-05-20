@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
 #include "flat_tree_map.h"
 #include <vector>
@@ -90,8 +89,3 @@ TEST_CASE("set intersection example") {
     CHECK(out[1].first == 15);
 }
 
-int main(int argc, char** argv) {
-    doctest::Context context;
-    context.applyCommandLine(argc, argv);
-    return context.run();
-}

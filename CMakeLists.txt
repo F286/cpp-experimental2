@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(chunk_map_tests LANGUAGES CXX)
+project(all_tests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,18 +11,13 @@ else()
     add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
-add_executable(test_chunk_map
-    test_chunk_map.cpp
-    chunk_map.h
+file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
+add_executable(tests ${TEST_SOURCES})
+
+target_include_directories(tests PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/tests
 )
 
-add_executable(test_flat_tree_map
-    test_flat_tree_map.cpp
-    flat_tree_map.h
-    arrow_proxy.h
-)
-
-add_executable(test_flyweight_map
-    test_flyweight_map.cpp
-    flyweight_map.h
-)
+enable_testing()
+add_test(NAME run_tests COMMAND tests)

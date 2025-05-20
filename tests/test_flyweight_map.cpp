@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
 #include "flyweight_map.h"
 #include <string>
@@ -51,8 +50,3 @@ TEST_CASE("ranges views") {
     CHECK(vals == expected);
 }
 
-int main(int argc, char** argv) {
-    doctest::Context context;
-    context.applyCommandLine(argc, argv);
-    return context.run();
-}
