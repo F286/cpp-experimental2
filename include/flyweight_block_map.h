@@ -316,6 +316,22 @@ private:
     block_key block_{};
 };
 
+/// @brief Compare two maps for equality.
+template<typename Key, typename T, std::size_t N>
+bool operator==(const flyweight_block_map<Key,T,N>& a,
+                const flyweight_block_map<Key,T,N>& b) noexcept
+{
+    return a.key() == b.key();
+}
+
+/// @brief Inequality comparison.
+template<typename Key, typename T, std::size_t N>
+bool operator!=(const flyweight_block_map<Key,T,N>& a,
+                const flyweight_block_map<Key,T,N>& b) noexcept
+{
+    return !(a == b);
+}
+
 /// @brief View object exposing deduplicated blocks for a flyweight_block_map.
 template<typename Map>
 class flyweight_block_map_blocks_view {
