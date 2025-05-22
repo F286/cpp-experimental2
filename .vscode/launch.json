@@ -2,12 +2,12 @@
     "version": "0.2.0",
     "configurations": [
       {
-        "name":          "build → run test_chunk_map",
+        "name":          "build → run",
         "type":          "cppdbg",
         "MIMode":        "gdb",        
         "miDebuggerPath": "C:\\Qt\\Tools\\mingw1120_64\\bin\\gdb.exe",
         "request":       "launch",
-        "program":       "${workspaceFolder}\\build\\Debug\\test_chunk_map.exe",
+        "program":       "${workspaceFolder}\\build\\Debug\\tests.exe",
         "cwd":           "${workspaceFolder}",
         "preLaunchTask": "cmake-build-debug",
         "noDebug":       false                  // ← skips full debug UI
