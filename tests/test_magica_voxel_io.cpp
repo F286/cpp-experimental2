@@ -13,10 +13,12 @@ TEST_CASE("magica_voxel round trip") {
     }
     CHECK(std::filesystem::file_size(path) > 0);
 
-    magica_voxel_reader<block_t> r(path.string());
-    auto loaded = r.read();
-    REQUIRE(loaded.size() == 1);
-    CHECK(loaded[0] == map);
+    {
+        magica_voxel_reader<block_t> r(path.string());
+        auto loaded = r.read();
+        REQUIRE(loaded.size() == 1);
+        CHECK(loaded[0] == map);
+    }
 
     std::filesystem::remove(path);
 }
