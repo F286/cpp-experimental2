@@ -19,5 +19,10 @@ target_include_directories(tests PRIVATE
     ${PROJECT_SOURCE_DIR}/tests
 )
 
+add_executable(create_voxel examples/create_voxel.cpp)
+target_include_directories(create_voxel PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
 enable_testing()
 add_test(NAME run_tests COMMAND tests)
