@@ -13,16 +13,14 @@ endif()
 
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
 add_executable(tests ${TEST_SOURCES})
+target_sources(tests PRIVATE examples/create_voxel.cpp)
 
 target_include_directories(tests PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/tests
+    ${PROJECT_SOURCE_DIR}/examples
 )
 
-add_executable(create_voxel examples/create_voxel.cpp)
-target_include_directories(create_voxel PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-)
 
 enable_testing()
 add_test(NAME run_tests COMMAND tests)
