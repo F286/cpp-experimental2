@@ -205,22 +205,67 @@ public:
 
     /// @brief Insert or assign a value at key.
     void insert_or_assign(const key_type& key, const T& val) {
-        auto idx = static_cast<size_type>(key) / bits_;
-        auto bit = static_cast<size_type>(key) % bits_;
-        if (idx >= buckets_.size()) buckets_.resize(idx + 1);
-        auto arr = buckets_[idx];
+        insert_or_assign_impl(key, val);
+    }
 
-        int val_idx = 0;
-        for (size_type i = 0; i < bits_; ++i) {
-            int vi = arr[i];
-            if (vi != 0 && values_[vi] == val) { val_idx = vi; break; }
+    /// @brief Insert or assign a value at key using move semantics.
+    void insert_or_assign(const key_type& key, T&& val) {
+        insert_or_assign_impl(key, std::move(val));
+    }
+
+    /// @brief Insert a range of key/value pairs.
+    template<std::ranges::input_range R>
+    void insert_range(R&& range) {
+        for (auto&& elem : range) {
+            auto&& [k, v] = elem;
+            insert_or_assign(k, std::forward<decltype(v)>(v));
         }
-        if (val_idx == 0) {
-            values_.push_back(val);
-            val_idx = static_cast<int>(values_.size() - 1);
+    }
+
+    /// @brief Insert all entries from another map.
+    void insert_range(const bucket_map& other) {
+        if (other.empty()) return;
+        if (empty()) {
+            buckets_ = other.buckets_;
+            values_  = other.values_;
+            size_    = other.size_;
+            return;
         }
-        if (arr[bit] == 0) ++size_;
-        arr[bit] = val_idx;
+        for (size_type b = 0; b < other.buckets_.size(); ++b) {
+            auto arr = other.buckets_[b];
+            for (size_type bit = 0; bit < bits_; ++bit) {
+                int vi = arr[bit];
+                if (vi != 0) insert_or_assign(b * bits_ + bit, other.values_[vi]);
+            }
+        }
+    }
+
+    /// @brief Insert all entries from another map by moving.
+    void insert_range(bucket_map&& other) {
+        if (other.empty()) return;
+        if (empty()) {
+            buckets_ = std::move(other.buckets_);
+            values_  = std::move(other.values_);
+            size_    = other.size_;
+            other.clear();
+            return;
+        }
+        std::vector<bool> moved(other.values_.size(), false);
+        for (size_type b = 0; b < other.buckets_.size(); ++b) {
+            auto arr = other.buckets_[b];
+            for (size_type bit = 0; bit < bits_; ++bit) {
+                int vi = arr[bit];
+                if (vi != 0) {
+                    if (!moved[vi]) {
+                        insert_or_assign(b * bits_ + bit, std::move(other.values_[vi]));
+                        moved[vi] = true;
+                    } else {
+                        insert_or_assign(b * bits_ + bit, other.values_[vi]);
+                    }
+                }
+            }
+        }
+        other.clear();
     }
 
     /// @brief Erase key and return count removed.
@@ -248,6 +293,27 @@ public:
     nodes_view nodes() const { return nodes_view(this); }
 
 private:
+    /// @brief Implementation of insert_or_assign with perfect forwarding.
+    template<typename U>
+    void insert_or_assign_impl(const key_type& key, U&& val) {
+        auto idx = static_cast<size_type>(key) / bits_;
+        auto bit = static_cast<size_type>(key) % bits_;
+        if (idx >= buckets_.size()) buckets_.resize(idx + 1);
+        auto arr = buckets_[idx];
+
+        const T& ref = val;
+        int val_idx = 0;
+        for (size_type i = 0; i < bits_; ++i) {
+            int vi = arr[i];
+            if (vi != 0 && values_[vi] == ref) { val_idx = vi; break; }
+        }
+        if (val_idx == 0) {
+            values_.push_back(std::forward<U>(val));
+            val_idx = static_cast<int>(values_.size() - 1);
+        }
+        if (arr[bit] == 0) ++size_;
+        arr[bit] = val_idx;
+    }
     /// @brief Value index at key or 0 if empty.
     int value_index_at(size_type key) const noexcept {
         auto idx = key / bits_;

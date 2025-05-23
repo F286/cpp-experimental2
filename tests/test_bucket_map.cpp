@@ -82,3 +82,39 @@ TEST_CASE("range with empty bucket between") {
     CHECK(keys.back() == 191);
 }
 
+TEST_CASE("insert_range from vector") {
+    bucket_map<std::size_t, std::string> map;
+    std::vector<std::pair<std::size_t, std::string>> vals{{0, "a"}, {1, "b"}, {5, "a"}};
+    map.insert_range(vals);
+    CHECK(map.size() == 3);
+    CHECK(map.at(1) == "b");
+    auto nodes = map.nodes();
+    CHECK(std::distance(nodes.begin(), nodes.end()) == 2);
+}
+
+TEST_CASE("insert_range move map") {
+    bucket_map<std::size_t, std::string> src;
+    src.insert_or_assign(3, "x");
+    src.insert_or_assign(4, "y");
+    bucket_map<std::size_t, std::string> dst;
+    dst.insert_range(std::move(src));
+    CHECK(dst.size() == 2);
+    CHECK(dst.contains(3));
+    CHECK(src.empty());
+}
+
+TEST_CASE("insert_range move with overlap") {
+    bucket_map<std::size_t, std::string> src;
+    src.insert_or_assign(0, "x");
+    src.insert_or_assign(128, "c");
+    bucket_map<std::size_t, std::string> dst;
+    dst.insert_or_assign(0, "a");
+    dst.insert_or_assign(64, "b");
+    dst.insert_range(std::move(src));
+    CHECK(dst.size() == 3);
+    CHECK(dst.at(0) == "x");
+    CHECK(dst.at(64) == "b");
+    CHECK(dst.at(128) == "c");
+    CHECK(src.empty());
+}
+
