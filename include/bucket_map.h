@@ -21,14 +21,33 @@ public:
     /// @brief Size type of the container.
     using size_type   = std::size_t;
 
-    /// @brief Node describing keys with the same value within a bucket.
+    /// @brief Node referencing a deduplicated value.
     struct node {
-        /// @brief Bucket index of the node.
-        std::size_t bucket_index{};
-        /// @brief Bit mask of keys using the value.
-        Bucket mask{};
-        /// @brief Stored value referenced by the mask.
-        T value{};
+        /// @brief Container storing keys referencing the value.
+        using occupied_set = std::vector<key_type>;
+
+        /// @brief Keys referencing the value.
+        occupied_set occupied() const {
+            occupied_set out;
+            for (size_type bit = 0; bit < bits_; ++bit) {
+                if (mask_ & (Bucket{1} << bit))
+                    out.push_back(static_cast<key_type>(bucket_index_ * bits_ + bit));
+            }
+            return out;
+        }
+
+        /// @brief Referenced value.
+        const T& value() const { return *value_ptr_; }
+
+    private:
+        /// @brief Bucket index this node belongs to.
+        size_type bucket_index_{};
+        /// @brief Bit mask of occupied keys.
+        Bucket mask_{};
+        /// @brief Pointer to the stored value.
+        const T* value_ptr_{};
+
+        friend class bucket_map;
     };
 
     /// @brief Forward iterator over constant elements.
@@ -69,21 +88,92 @@ public:
         size_type key_{};
     };
 
-    /// @brief View of nodes computed from buckets.
+    /// @brief Lazy view providing nodes per bucket.
     class nodes_view {
     public:
-        using vector_type   = std::vector<node>;
-        using const_iterator = typename vector_type::const_iterator;
+        /// @brief Iterator over lazily computed nodes.
+        class const_iterator {
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using iterator_concept  = std::forward_iterator_tag;
+            using difference_type   = std::ptrdiff_t;
+            using value_type        = std::pair<const size_type, node>;
+            using reference         = value_type;
+            using pointer           = arrow_proxy<reference>;
+
+            /// @brief Default constructed end iterator.
+            const_iterator() = default;
+            /// @brief Construct from map and starting bucket.
+            const_iterator(const bucket_map* m, size_type b)
+                : map_(m), bucket_(b) { load(); }
+
+            /// @brief Dereference to bucket/node pair.
+            reference operator*() const {
+                auto [vi, mask] = masks_[index_];
+                node n{};
+                n.bucket_index_ = bucket_;
+                n.mask_ = mask;
+                n.value_ptr_ = &map_->values_[vi];
+                return {bucket_, n};
+            }
+            /// @brief Arrow operator for structured bindings.
+            pointer operator->() const { return pointer{**this}; }
+            /// @brief Pre-increment iterator.
+            const_iterator& operator++() {
+                ++index_;
+                if (index_ >= masks_.size()) {
+                    ++bucket_;
+                    load();
+                }
+                return *this;
+            }
+            /// @brief Post-increment iterator.
+            const_iterator operator++(int) { auto t = *this; ++(*this); return t; }
+            /// @brief Equality comparison.
+            bool operator==(const const_iterator& o) const {
+                return bucket_ == o.bucket_ && index_ == o.index_;
+            }
+            /// @brief Inequality comparison.
+            bool operator!=(const const_iterator& o) const { return !(*this == o); }
+
+        private:
+            /// @brief Load data for current bucket.
+            void load() {
+                masks_.clear();
+                index_ = 0;
+                while (bucket_ < map_->buckets_.size()) {
+                    std::map<int, Bucket> tmp;
+                    auto arr = map_->buckets_[bucket_];
+                    for (size_type bit = 0; bit < bits_; ++bit) {
+                        int vi = arr[bit];
+                        if (vi != 0) tmp[vi] |= Bucket{1} << bit;
+                    }
+                    for (auto [vi, mask] : tmp) masks_.push_back({vi, mask});
+                    if (!masks_.empty()) break;
+                    ++bucket_;
+                }
+            }
+
+            /// @brief Parent container pointer.
+            const bucket_map* map_{};
+            /// @brief Current bucket index.
+            size_type bucket_{};
+            /// @brief Masks for the current bucket.
+            std::vector<std::pair<int, Bucket>> masks_{};
+            /// @brief Index into the current masks.
+            size_type index_{0};
+        };
 
         /// @brief Begin iterator over nodes.
-        const_iterator begin() const noexcept { return nodes_.begin(); }
+        const_iterator begin() const { return const_iterator(map_, 0); }
         /// @brief End iterator over nodes.
-        const_iterator end() const noexcept { return nodes_.end(); }
+        const_iterator end() const { return const_iterator(map_, map_->buckets_.size()); }
+
     private:
-        explicit nodes_view(vector_type n) : nodes_(std::move(n)) {}
+        explicit nodes_view(const bucket_map* m) : map_(m) {}
         friend class bucket_map;
-        /// @brief Stored collection of nodes.
-        vector_type nodes_{};
+        /// @brief Pointer to parent container.
+        const bucket_map* map_{};
     };
 
     /// @brief Default constructed empty map.
@@ -154,22 +244,8 @@ public:
     /// @brief End iterator ADL helper.
     friend const_iterator end(const bucket_map& m) noexcept { return m.end(); }
 
-    /// @brief Compute nodes describing stored values.
-    nodes_view nodes() const {
-        std::vector<node> out;
-        for (size_type idx = 0; idx < buckets_.size(); ++idx) {
-            auto arr = buckets_[idx];
-            std::map<int, Bucket> masks;
-            for (size_type bit = 0; bit < bits_; ++bit) {
-                int vi = arr[bit];
-                if (vi != 0) masks[vi] |= Bucket{1} << bit;
-            }
-            for (auto [vi, mask] : masks) {
-                out.push_back(node{idx, mask, values_[vi]});
-            }
-        }
-        return nodes_view(std::move(out));
-    }
+    /// @brief View lazily describing stored nodes.
+    nodes_view nodes() const { return nodes_view(this); }
 
 private:
     /// @brief Value index at key or 0 if empty.

@@ -8,6 +8,7 @@ namespace checks {
     using map_t   = bucket_map<std::size_t, std::string>;
     using iter_t  = map_t::const_iterator;
     using view_t  = map_t::nodes_view;
+    using node_t  = map_t::node;
 
     static_assert(std::forward_iterator<iter_t>);
     static_assert(std::sentinel_for<iter_t, iter_t>);
@@ -16,6 +17,8 @@ namespace checks {
     static_assert(std::ranges::forward_range<view_t>);
     static_assert(std::same_as<std::ranges::range_value_t<map_t>,
                                std::pair<const std::size_t, const std::string&>>);
+    static_assert(std::same_as<std::ranges::range_value_t<view_t>,
+                               std::pair<const std::size_t, node_t>>);
 }
 
 TEST_CASE("insert and size") {
@@ -32,7 +35,7 @@ TEST_CASE("deduplicate nodes in bucket") {
     map.insert_or_assign(2, "x");
     auto nodes = map.nodes();
     CHECK(std::distance(nodes.begin(), nodes.end()) == 1);
-    CHECK(nodes.begin()->mask != 0);
+    CHECK(!nodes.begin()->second.occupied().empty());
 }
 
 TEST_CASE("iteration order") {
@@ -72,7 +75,7 @@ TEST_CASE("range with empty bucket between") {
     for(std::size_t i = 128; i < 192; ++i) map.insert_or_assign(i, 2);
     auto nodes = map.nodes();
     CHECK(std::distance(nodes.begin(), nodes.end()) == 2);
-    CHECK(std::next(nodes.begin())->bucket_index == 2);
+    CHECK(std::next(nodes.begin())->first == 2);
     std::vector<std::size_t> keys;
     for(auto const& [k,v] : map) keys.push_back(k);
     CHECK(keys.front() == 0);
