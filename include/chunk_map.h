@@ -9,57 +9,10 @@
 #include <compare>
 #include <stdexcept>
 #include <utility>
+#include <cstddef>
 
 #include "arrow_proxy.h"
-
-// ── forward declarations so the class bodies can mention each other ──
-struct GlobalPosition;
-struct ChunkPosition;
-struct LocalPosition;
-
-// ───────────────── ChunkPosition & LocalPosition – simple bodies ─────
-struct ChunkPosition {
-    int value{};
-    constexpr explicit ChunkPosition(int chunkIdx) : value(chunkIdx) {}
-    constexpr explicit ChunkPosition(GlobalPosition);                 // declared, defined later
-    constexpr auto operator<=>(ChunkPosition const&) const = default;
-    constexpr bool operator==(ChunkPosition const&) const = default;
-};
-
-struct LocalPosition {
-    int value{};
-    constexpr explicit LocalPosition(int localIdx) : value(localIdx & 31) {}
-    constexpr explicit LocalPosition(GlobalPosition);                  // declared, defined later
-    constexpr auto operator<=>(LocalPosition const&) const = default;
-    constexpr bool operator==(LocalPosition const&) const = default;
-};
-
-// ────────────────── GlobalPosition – now can mention C & L ───────────
-struct GlobalPosition {
-    int value{};
-    constexpr explicit GlobalPosition(int v) : value(v) {}
-    constexpr explicit GlobalPosition(ChunkPosition);   // declared, defined later
-    constexpr explicit GlobalPosition(LocalPosition);   // declared, defined later
-
-    constexpr auto operator<=>(GlobalPosition const&) const = default;
-    constexpr bool operator==(GlobalPosition const&) const = default;
-
-    constexpr GlobalPosition operator+(GlobalPosition other) const
-    { return GlobalPosition{ value + other.value }; }
-};
-
-// ────────────────── out-of-class definitions (all types complete) ────
-constexpr ChunkPosition::ChunkPosition(GlobalPosition g)
-    : value(g.value >> 5) {}
-
-constexpr LocalPosition::LocalPosition(GlobalPosition g)
-    : value(g.value & 31) {}
-
-constexpr GlobalPosition::GlobalPosition(ChunkPosition c)
-    : value(c.value << 5) {}
-    
-constexpr GlobalPosition::GlobalPosition(LocalPosition l)
-    : value(l.value) {}
+#include "positions.h"
     
 
 template <
