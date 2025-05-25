@@ -51,7 +51,7 @@ public:
     };
 
     /// @brief Forward iterator over constant elements.
-    class const_iterator {
+class const_iterator {
     public:
         using iterator_category = std::forward_iterator_tag;
         using iterator_concept  = std::forward_iterator_tag;
@@ -66,7 +66,7 @@ public:
         const_iterator(const bucket_map* m, size_type k) : map_(m), key_(k) { advance(); }
 
         /// @brief Dereference to key/value pair.
-        reference operator*() const { return {key_, map_->values_[map_->value_index_at(key_)]}; }
+        reference operator*() const { return {key_type(key_), map_->values_[map_->value_index_at(key_)]}; }
         /// @brief Arrow operator for structured bindings.
         pointer operator->() const { return pointer{**this}; }
         /// @brief Pre-increment iterator.
@@ -87,6 +87,9 @@ public:
         /// @brief Current key index.
         size_type key_{};
     };
+
+    /// @brief Mutable iterator aliasing const_iterator.
+    using iterator = const_iterator;
 
     /// @brief Lazy view providing nodes per bucket.
     class nodes_view {
@@ -284,6 +287,10 @@ public:
     const_iterator begin() const noexcept { return const_iterator(this, 0); }
     /// @brief Iterator past last element.
     const_iterator end() const noexcept { return const_iterator(this, capacity()); }
+    /// @brief Non-const iterator to first element.
+    iterator begin() noexcept { return iterator(this, 0); }
+    /// @brief Non-const iterator past last element.
+    iterator end() noexcept { return iterator(this, capacity()); }
     /// @brief Begin iterator ADL helper.
     friend const_iterator begin(const bucket_map& m) noexcept { return m.begin(); }
     /// @brief End iterator ADL helper.

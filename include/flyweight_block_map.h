@@ -86,7 +86,7 @@ private:
         if constexpr(std::integral<key_type>) {
             return static_cast<std::size_t>(key);
         } else {
-            return static_cast<std::size_t>(key.value);
+            return static_cast<std::size_t>(key) & (BlockSize - 1);
         }
     }
 
