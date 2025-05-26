@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <vector>
 #include <map>
+#include <utility>
 #include "arrow_proxy.h"
 #include "flat_vector_array_packed.h"
 
@@ -48,6 +49,23 @@ public:
         const T* value_ptr_{};
 
         friend class bucket_map;
+    };
+
+    /// @brief Proxy reference to mutable value access.
+    class reference {
+    public:
+        /// @brief Construct proxy from map and key.
+        reference(bucket_map& m, key_type k) : map_(&m), key_(k) {}
+        /// @brief Convert to constant reference.
+        operator const T&() const { return map_->at(key_); }
+        /// @brief Assign through proxy.
+        reference& operator=(const T& v) { map_->insert_or_assign(key_, v); return *this; }
+        /// @brief Move-assign through proxy.
+        reference& operator=(T&& v) { map_->insert_or_assign(key_, std::move(v)); return *this; }
+
+    private:
+        bucket_map* map_{}; ///< @brief Parent container pointer.
+        key_type    key_{}; ///< @brief Referenced key.
     };
 
     /// @brief Forward iterator over constant elements.
@@ -203,8 +221,23 @@ class const_iterator {
         return values_[idx];
     }
 
+
     /// @brief Check if key exists in map.
     bool contains(const key_type& key) const noexcept { return value_index_at(key) != 0; }
+
+    /// @brief Access value inserting default if missing.
+    reference operator[](const key_type& key) {
+        if (!contains(key)) insert_or_assign(key, T{});
+        return reference(*this, key);
+    }
+    /// @brief Read-only access to existing value.
+    const T& operator[](const key_type& key) const { return at(key); }
+
+    /// @brief Const iterator to element if present.
+    const_iterator find(const key_type& key) const {
+        if (!contains(key)) return end();
+        return const_iterator(this, static_cast<size_type>(key));
+    }
 
     /// @brief Insert or assign a value at key.
     void insert_or_assign(const key_type& key, const T& val) {
