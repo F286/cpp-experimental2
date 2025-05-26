@@ -118,3 +118,18 @@ TEST_CASE("insert_range move with overlap") {
     CHECK(src.empty());
 }
 
+TEST_CASE("ranges to from vector") {
+    std::vector<std::pair<std::size_t, std::string>> vals{{1, "a"}, {2, "b"}};
+    auto map = std::ranges::to<bucket_map<std::size_t, std::string>>(vals);
+    CHECK(map.size() == 2);
+    CHECK(map.at(2) == "b");
+}
+
+TEST_CASE("ranges to move map") {
+    bucket_map<std::size_t, std::string> src;
+    src.insert_or_assign(5, "v");
+    auto dst = std::ranges::to<bucket_map<std::size_t, std::string>>(std::move(src));
+    CHECK(dst.contains(5));
+    CHECK(src.empty());
+}
+
