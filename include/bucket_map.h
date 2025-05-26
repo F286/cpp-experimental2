@@ -200,6 +200,21 @@ class const_iterator {
     /// @brief Default constructed empty map.
     bucket_map() { values_.push_back(T{}); }
 
+    /// @brief Construct map from input range.
+    template<std::ranges::input_range R>
+        requires (!std::same_as<std::remove_cvref_t<R>, bucket_map>)
+    explicit bucket_map(R&& range) : bucket_map() {
+        insert_range(std::forward<R>(range));
+    }
+
+    /// @brief Construct map by copying another map.
+    bucket_map(const bucket_map& other) : bucket_map() { insert_range(other); }
+
+    /// @brief Construct map by moving another map.
+    bucket_map(bucket_map&& other) noexcept : bucket_map() {
+        insert_range(std::move(other));
+    }
+
     /// @brief True if container has no elements.
     bool empty() const noexcept { return size_ == 0; }
 
@@ -372,4 +387,18 @@ private:
     /// @brief Current number of stored keys.
     size_type size_{0};
 };
+
+namespace std::ranges {
+    /// @brief Convert a range to a container using insert_range if available.
+    template<class C, std::ranges::input_range R>
+    C to(R&& r) {
+        if constexpr (requires(C c) { c.insert_range(std::declval<R>()); }) {
+            C out;
+            out.insert_range(std::forward<R>(r));
+            return out;
+        } else {
+            return C(std::forward<R>(r));
+        }
+    }
+}
 
