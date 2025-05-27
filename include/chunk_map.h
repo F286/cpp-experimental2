@@ -270,6 +270,36 @@ public:
         const chunk_map* parent_{nullptr};
         typename OuterMap::const_iterator outerIt_;
         typename InnerMap::const_iterator innerIt_;
-    };
+    }; 
+
 };
+
+template<class>
+struct is_chunk_map : std::false_type {};
+template<typename T, typename InnerMap, typename OuterMap>
+struct is_chunk_map<chunk_map<T, InnerMap, OuterMap>> : std::true_type {};
+
+namespace std::ranges {
+    /// @brief Convert a range to a chunk_map.
+    template<class C, std::ranges::input_range R>
+        requires is_chunk_map<std::remove_cvref_t<C>>::value
+    C to(R&& r)
+    {
+        if constexpr (std::same_as<std::remove_cvref_t<R>, C>) {
+            if constexpr (std::is_lvalue_reference_v<R>) {
+                return r;
+            } else {
+                return std::move(r);
+            }
+        } else {
+            C out;
+            for (auto&& elem : r) {
+                auto&& [gp, val] = elem;
+                out[gp] = std::forward<decltype(val)>(val);
+            }
+            return out;
+        }
+    }
+}
+
 
