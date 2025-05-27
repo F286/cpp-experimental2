@@ -81,3 +81,20 @@ TEST_CASE("set_intersection on full pairs") {
     CHECK(inter[1].first == GlobalPosition{45});
 }
 
+TEST_CASE("ranges to from vector for chunk_map") {
+    std::vector<std::pair<GlobalPosition, int>> vals{
+        {GlobalPosition{1,0,0}, 1}, {GlobalPosition{2,0,0}, 2}
+    };
+    auto cm = std::ranges::to<chunk_map<int>>(vals);
+    CHECK(cm.size() == 2);
+    CHECK(cm.at(GlobalPosition{2,0,0}) == 2);
+}
+
+TEST_CASE("ranges to move chunk_map") {
+    chunk_map<int> src;
+    src[GlobalPosition{3,0,0}] = 5;
+    auto dst = std::ranges::to<chunk_map<int>>(std::move(src));
+    CHECK(dst.find(GlobalPosition{3,0,0}) != dst.end());
+    CHECK(src.empty());
+}
+

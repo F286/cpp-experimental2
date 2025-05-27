@@ -42,3 +42,18 @@ TEST_CASE("layered_map iteration order") {
     CHECK(keys[2] == GlobalPosition{32,0,0});
 }
 
+TEST_CASE("ranges to layered_map from vector") {
+    std::vector<std::pair<GlobalPosition, int>> vals{{GlobalPosition{0,0,0}, 1}};
+    auto lm = std::ranges::to<layered_map<int>>(vals);
+    CHECK(lm.size() == 1);
+    CHECK(lm.at(GlobalPosition{0,0,0}) == 1);
+}
+
+TEST_CASE("ranges to move layered_map") {
+    layered_map<int> src;
+    src[GlobalPosition{1,0,0}] = 4;
+    auto dst = std::ranges::to<layered_map<int>>(std::move(src));
+    CHECK(dst.find(GlobalPosition{1,0,0}) != dst.end());
+    CHECK(src.empty());
+}
+
