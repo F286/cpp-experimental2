@@ -8,8 +8,8 @@ TEST_CASE("magica_voxel round trip") {
 
     auto path = std::filesystem::temp_directory_path()/"mv_round.vox";
     {
-        magica_voxel_writer<block_t> w(path.string());
-        w.write({map});
+        magica_voxel_writer w(path.string());
+        w.write(map);
     }
     CHECK(std::filesystem::file_size(path) > 0);
 
