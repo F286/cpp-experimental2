@@ -189,6 +189,12 @@ public:
         return const_iterator(this, chunks_.end(), typename InnerMap::const_iterator());
     }
 
+    /// @brief Call functor for each element in the intersection of two maps.
+    template<typename Fn>
+    static void for_each_intersection(const chunk_map& lhs,
+                                      const chunk_map& rhs,
+                                      Fn&& fn);
+
 private:
     OuterMap chunks_;
         
@@ -306,6 +312,33 @@ public:
     }; 
 
 };
+
+template<typename T, typename InnerMap, typename OuterMap>
+template<typename Fn>
+void chunk_map<T, InnerMap, OuterMap>::for_each_intersection(const chunk_map& lhs,
+                                                             const chunk_map& rhs,
+                                                             Fn&& fn)
+{
+    for (const auto& [cp, left] : lhs.chunks_) {
+        auto it = rhs.chunks_.find(cp);
+        if (it == rhs.chunks_.end()) continue;
+        InnerMap::for_each_intersection(left, it->second,
+            [&](const typename InnerMap::key_type& lp, const T& val) {
+                fn(combine(cp, lp), val);
+            });
+    }
+}
+
+/// @brief Write elements present in both chunk_maps to output.
+template<typename T, typename InnerMap, typename OuterMap, typename OutIt>
+OutIt set_intersection(const chunk_map<T, InnerMap, OuterMap>& lhs,
+                       const chunk_map<T, InnerMap, OuterMap>& rhs,
+                       OutIt out)
+{
+    chunk_map<T, InnerMap, OuterMap>::for_each_intersection(lhs, rhs,
+        [&](GlobalPosition gp, const T& val) { *out++ = std::pair{gp, val}; });
+    return out;
+}
 
 template<class>
 struct is_chunk_map : std::false_type {};

@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <utility>
+#include <bit>
 #include "arrow_proxy.h"
 #include "flat_vector_array_packed.h"
 
@@ -39,6 +40,12 @@ public:
 
         /// @brief Referenced value.
         const T& value() const { return *value_ptr_; }
+
+        /// @brief Mask of occupied keys.
+        Bucket mask() const { return mask_; }
+
+        /// @brief Index of the containing bucket.
+        size_type bucket_index() const { return bucket_index_; }
 
     private:
         /// @brief Bucket index this node belongs to.
@@ -350,6 +357,15 @@ class const_iterator {
     /// @brief View lazily describing stored nodes.
     nodes_view nodes() const { return nodes_view(this); }
 
+    /// @brief Call functor for each entry present in both maps.
+    template<typename Fn>
+    static void for_each_intersection(const bucket_map& lhs,
+                                      const bucket_map& rhs,
+                                      Fn&& fn);
+
+    /// @brief Bit mask of occupied entries in a bucket array.
+    static Bucket mask_of(const bucket_array& arr);
+
 private:
     /// @brief Implementation of insert_or_assign with perfect forwarding.
     template<typename U>
@@ -390,6 +406,56 @@ private:
     /// @brief Current number of stored keys.
     size_type size_{0};
 };
+
+template<typename Key, typename T, typename Bucket>
+Bucket bucket_map<Key, T, Bucket>::mask_of(const bucket_array& arr)
+{
+    Bucket mask{};
+    for (std::size_t bit = 0; bit < bits_; ++bit)
+        if (arr[bit] != 0) mask |= Bucket{1} << bit;
+    return mask;
+}
+
+/// @brief Invoke function for each set bit in a mask.
+template<typename Bucket, typename Fn>
+static void for_each_set_bit(Bucket mask, Fn&& fn)
+{
+    while (mask) {
+        auto bit = std::countr_zero(mask);
+        fn(static_cast<std::size_t>(bit));
+        mask &= mask - 1;
+    }
+}
+
+template<typename Key, typename T, typename Bucket>
+template<typename Fn>
+void bucket_map<Key, T, Bucket>::for_each_intersection(const bucket_map& lhs,
+                                                       const bucket_map& rhs,
+                                                       Fn&& fn)
+{
+    size_type max_b = std::min(lhs.buckets_.size(), rhs.buckets_.size());
+    for (size_type b = 0; b < max_b; ++b) {
+        auto arr_l = lhs.buckets_[b];
+        auto arr_r = rhs.buckets_[b];
+        Bucket mask = bucket_map<Key, T, Bucket>::mask_of(arr_l)
+                    & bucket_map<Key, T, Bucket>::mask_of(arr_r);
+        for_each_set_bit(mask, [&](size_type bit) {
+            Key key{static_cast<std::uint32_t>(b * bits_ + bit)};
+            fn(key, lhs.values_[arr_l[bit]]);
+        });
+    }
+}
+
+/// @brief Write entries present in both maps to output iterator.
+template<typename Key, typename T, typename Bucket, typename OutIt>
+OutIt set_intersection(const bucket_map<Key, T, Bucket>& lhs,
+                       const bucket_map<Key, T, Bucket>& rhs,
+                       OutIt out)
+{
+    bucket_map<Key, T, Bucket>::for_each_intersection(lhs, rhs,
+        [&](Key k, const T& v) { *out++ = std::pair{k, v}; });
+    return out;
+}
 
 namespace std::ranges {
     /// @brief Convert a range to a container using insert_range if available.

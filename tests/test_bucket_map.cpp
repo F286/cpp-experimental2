@@ -133,3 +133,20 @@ TEST_CASE("ranges to move map") {
     CHECK(src.empty());
 }
 
+TEST_CASE("optimized set_intersection") {
+    bucket_map<std::size_t, int> lhs;
+    lhs.insert_or_assign(1, 1);
+    lhs.insert_or_assign(5, 2);
+    lhs.insert_or_assign(70, 3);
+    bucket_map<std::size_t, int> rhs;
+    rhs.insert_or_assign(0, 0);
+    rhs.insert_or_assign(5, 8);
+    rhs.insert_or_assign(70, 9);
+
+    std::vector<std::pair<std::size_t, int>> inter;
+    set_intersection(lhs, rhs, std::back_inserter(inter));
+
+    std::vector<std::pair<std::size_t, int>> expected{{5, 2}, {70, 3}};
+    CHECK(inter == expected);
+}
+
