@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <iterator>
 #include <algorithm>
+#include <numeric>
 #include <compare>
 #include <stdexcept>
 #include <utility>
@@ -38,12 +39,12 @@ public:
         return chunks_.empty();
     }
 
-    /** Total number of elements across all chunks. */
+    /// @brief Total number of elements across all chunks.
     size_type size() const {
-        size_type count = 0;
-        for (auto const& [cpos, inner] : chunks_)
-            count += inner.size();
-        return count;
+        return std::accumulate(chunks_.begin(), chunks_.end(), size_type{0},
+            [](size_type total, const auto& pair) {
+                return total + pair.second.size();
+            });
     }
 
     /** Removes all elements (all chunks). */

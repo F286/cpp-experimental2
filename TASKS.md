@@ -1,0 +1,4 @@
+- Replace manual loops that compute aggregated information with standard algorithms to clarify intent (e.g. using std::accumulate).
+- Replace iterative min/max calculations with standard library facilities like std::ranges::minmax.
+- Replace loops building temporary containers with std::ranges algorithms for clearer expression.
+- Replace loops iterating over bit planes in flat_vector_array_packed with algorithms where possible.
