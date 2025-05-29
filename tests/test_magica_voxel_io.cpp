@@ -6,10 +6,10 @@ TEST_CASE("magica_voxel round trip") {
     using block_t = flyweight_block_map<std::size_t, int>;
     block_t map; map.set(2,42); map.set(5,7);
 
-    auto path = std::filesystem::temp_directory_path()/"mv_round.vox";
+    auto path = std::filesystem::path(PROJECT_SOURCE_DIR)/"vox_output"/"mv_round.vox";
     {
-        magica_voxel_writer w(path.string());
-        w.write(map);
+        magica_voxel_writer w("mv_round");
+        w.add_frame(map);
     }
     CHECK(std::filesystem::file_size(path) > 0);
 
