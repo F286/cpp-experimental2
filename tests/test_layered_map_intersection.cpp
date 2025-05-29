@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "layered_map.h"
+#include "magica_voxel_io.h"
 #include "positions.h"
 #include <algorithm>
 #include <limits>
@@ -74,4 +75,7 @@ TEST_CASE("layered_map intersection sphere box") {
   CHECK(inter.size() == sphere.size());
   CHECK(bounds.first == expected_bounds.first);
   CHECK(bounds.second == expected_bounds.second);
+
+    magica_voxel_writer writer("intersection.vox");
+    writer.write({inter});
 }
