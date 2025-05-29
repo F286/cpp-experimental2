@@ -12,8 +12,8 @@ void create_voxel_example() {
     frame.set(2, 3);
     frame.set(4, 5);
 
-    magica_voxel_writer writer("simple_model.vox");
-    writer.write(frame);
+    magica_voxel_writer writer("simple_model");
+    writer.add_frame(frame);
 
     std::cout << "Wrote simple_model.vox\n";
 }

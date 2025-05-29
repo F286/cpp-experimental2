@@ -13,6 +13,7 @@ endif()
 
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
 add_executable(tests ${TEST_SOURCES})
+target_compile_definitions(tests PRIVATE PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_sources(tests PRIVATE examples/create_voxel.cpp)
 
 target_include_directories(tests PRIVATE

@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <ranges>
 #include <iostream>
+#include <filesystem>
 
 /*
     Excerpt from the official MagicaVoxel 0.99.5 VOX specification
@@ -84,19 +85,27 @@ namespace magica_voxel_detail {
 class magica_voxel_writer {
 public:
     /// @brief Open file for writing.
-    explicit magica_voxel_writer(const std::string& path)
-        : out_(path, std::ios::binary), path_(path)
+    explicit magica_voxel_writer(const std::string& name)
     {
+        namespace fs = std::filesystem;
+        auto base = fs::path(PROJECT_SOURCE_DIR) / "vox_output";
+        fs::create_directories(base);
+        path_ = (base / (name + ".vox")).string();
+        out_.open(path_, std::ios::binary);
         if (!out_) throw std::runtime_error("cannot open output file");
     }
 
-    /// @brief Write a single frame to a VOX file.
+    /// @brief Add a single frame to the VOX file.
     template<typename Map>
-    void write(const Map& frame)
+    void add_frame(const Map& frame)
     {
         std::array<Map,1> tmp{frame};
         write_frames(tmp);
     }
+
+    /// @brief Compatibility wrapper for add_frame.
+    template<typename Map>
+    void write(const Map& frame) { add_frame(frame); }
 
     /// @brief Write a range of map frames to a VOX file.
     template<std::ranges::input_range Range>
