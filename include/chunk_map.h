@@ -112,6 +112,38 @@ public:
         return const_iterator(this, itChunk, itLocal);
     }
 
+    /// @brief Insert value if key not present.
+    std::pair<iterator, bool> insert(const value_type& v) {
+        auto [cp, lp] = split(v.first);
+        auto [outerIt, outerInserted] = chunks_.try_emplace(cp);
+        (void)outerInserted;
+        bool existed = outerIt->second.contains(lp);
+        if (!existed) outerIt->second.insert_or_assign(lp, v.second);
+        auto innerIt = outerIt->second.find(lp);
+        return { iterator(this, outerIt, innerIt), !existed };
+    }
+
+    /// @brief Insert movable value if key not present.
+    std::pair<iterator, bool> insert(value_type&& v) {
+        auto [cp, lp] = split(v.first);
+        auto [outerIt, outerInserted] = chunks_.try_emplace(cp);
+        (void)outerInserted;
+        bool existed = outerIt->second.contains(lp);
+        if (!existed) outerIt->second.insert_or_assign(lp, std::move(v.second));
+        auto innerIt = outerIt->second.find(lp);
+        return { iterator(this, outerIt, innerIt), !existed };
+    }
+
+    /// @brief Insert value with hint.
+    iterator insert(const iterator&, const value_type& v) {
+        return insert(v).first;
+    }
+
+    /// @brief Insert movable value with hint.
+    iterator insert(const iterator&, value_type&& v) {
+        return insert(std::move(v)).first;
+    }
+
     /** 
      * Erase the element at GlobalPosition. Returns number of elements removed (0 or 1).
      */

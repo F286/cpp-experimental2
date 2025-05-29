@@ -57,3 +57,15 @@ TEST_CASE("ranges to move layered_map") {
     CHECK(src.empty());
 }
 
+TEST_CASE("layered_map insert method") {
+    layered_map<int> lm;
+    auto [it1, ok1] = lm.insert({GlobalPosition{2,2,2}, 7});
+    CHECK(ok1);
+    CHECK(it1->second == 7);
+
+    auto [it2, ok2] = lm.insert({GlobalPosition{2,2,2}, 9});
+    CHECK(!ok2);
+    CHECK(it2 == it1);
+    CHECK(it2->second == 7);
+}
+

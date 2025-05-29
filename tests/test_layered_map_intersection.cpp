@@ -63,11 +63,10 @@ TEST_CASE("layered_map intersection sphere box") {
   CHECK(static_cast<double>(sphere.size()) ==
         doctest::Approx(expected_volume).epsilon(0.15));
 
-  std::vector<std::pair<GlobalPosition, int>> inter_vec;
+  layered_map<int> inter;
   std::ranges::set_intersection(
-      box, sphere, std::back_inserter(inter_vec),
+      box, sphere, std::inserter(inter, inter.end()),
       [](auto const &a, auto const &b) { return a.first < b.first; });
-  auto inter = std::ranges::to<layered_map<int>>(inter_vec);
 
   layered_map<int> manual;
   for (auto const &[pos, val] : sphere)
