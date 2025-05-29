@@ -2,6 +2,7 @@
 #include "layered_map.h"
 #include "magica_voxel_io.h"
 #include "positions.h"
+#include "aabb.h"
 #include <algorithm>
 #include <limits>
 #include <numbers>
@@ -13,10 +14,8 @@ static layered_map<int> make_box(GlobalPosition min_corner,
                                  GlobalPosition max_corner,
                                  int value = 2) {
   layered_map<int> map;
-  for (std::uint32_t x = min_corner.x; x < max_corner.x; ++x)
-    for (std::uint32_t y = min_corner.y; y < max_corner.y; ++y)
-      for (std::uint32_t z = min_corner.z; z < max_corner.z; ++z)
-        map[GlobalPosition{x, y, z}] = value;
+  for (GlobalPosition p : GlobalAabb{min_corner, max_corner})
+    map[p] = value;
   return map;
 }
 
