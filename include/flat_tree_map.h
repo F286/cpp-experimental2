@@ -136,7 +136,7 @@ public:
     };
 
     // Default constructor: start with capacity=1 (one leaf & root)
-    flat_tree_map() : m_size(0), m_capacity(1), m_tree(1, false) {}
+    flat_tree_map() : m_tree(1, false), m_size(0), m_capacity(1) {}
 
     // Check if bit at key is set
     bool test(std::size_t key) const {
