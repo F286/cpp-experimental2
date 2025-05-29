@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "layered_map.h"
+#include "layered_map_algo.h"
 #include "magica_voxel_io.h"
 #include "positions.h"
 #include "aabb.h"
@@ -63,9 +64,8 @@ TEST_CASE("layered_map intersection sphere box") {
         doctest::Approx(expected_volume).epsilon(0.15));
 
   layered_map<int> inter;
-  std::ranges::set_intersection(
-      box, sphere, std::inserter(inter, inter.end()),
-      [](auto const &a, auto const &b) { return a.first < b.first; });
+  set_intersection(box, sphere,
+                   std::inserter(inter, inter.end()));
 
   layered_map<int> manual;
   for (auto const &[pos, val] : sphere)
