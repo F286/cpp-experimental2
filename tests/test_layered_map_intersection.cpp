@@ -77,5 +77,5 @@ TEST_CASE("layered_map intersection sphere box") {
   CHECK(bounds.second == expected_bounds.second);
 
     magica_voxel_writer writer("intersection.vox");
-    writer.write({inter});
+    writer.write(inter);
 }

@@ -286,7 +286,8 @@ class const_iterator {
             auto arr = other.buckets_[b];
             for (size_type bit = 0; bit < bits_; ++bit) {
                 int vi = arr[bit];
-                if (vi != 0) insert_or_assign(b * bits_ + bit, other.values_[vi]);
+                if (vi != 0) insert_or_assign(static_cast<key_type>(b * bits_ + bit),
+                                             other.values_[vi]);
             }
         }
     }
@@ -308,10 +309,12 @@ class const_iterator {
                 int vi = arr[bit];
                 if (vi != 0) {
                     if (!moved[vi]) {
-                        insert_or_assign(b * bits_ + bit, std::move(other.values_[vi]));
+                        insert_or_assign(static_cast<key_type>(b * bits_ + bit),
+                                         std::move(other.values_[vi]));
                         moved[vi] = true;
                     } else {
-                        insert_or_assign(b * bits_ + bit, other.values_[vi]);
+                        insert_or_assign(static_cast<key_type>(b * bits_ + bit),
+                                         other.values_[vi]);
                     }
                 }
             }
