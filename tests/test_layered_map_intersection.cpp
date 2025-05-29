@@ -8,28 +8,31 @@
 #include <ranges>
 #include <vector>
 
-/// @brief Create an axis aligned box of ones.
-static layered_map<int> make_box(GlobalPosition origin, std::uint32_t sx,
-                                 std::uint32_t sy, std::uint32_t sz) {
+/// @brief Create an axis aligned box filled with a value.
+static layered_map<int> make_box(GlobalPosition min_corner,
+                                 GlobalPosition max_corner,
+                                 int value = 2) {
   layered_map<int> map;
-  for (auto x : std::views::iota(0u, sx))
-    for (auto y : std::views::iota(0u, sy))
-      for (auto z : std::views::iota(0u, sz))
-        map[GlobalPosition{origin.x + x, origin.y + y, origin.z + z}] = 1;
+  for (std::uint32_t x = min_corner.x; x < max_corner.x; ++x)
+    for (std::uint32_t y = min_corner.y; y < max_corner.y; ++y)
+      for (std::uint32_t z = min_corner.z; z < max_corner.z; ++z)
+        map[GlobalPosition{x, y, z}] = value;
   return map;
 }
 
-/// @brief Create a sphere of ones.
+/// @brief Create a solid sphere filled with a value.
 static layered_map<int> make_sphere(GlobalPosition center,
-                                    std::uint32_t radius) {
+                                    std::uint32_t radius,
+                                    int value = 2) {
   layered_map<int> map;
-  int r = static_cast<int>(radius);
-  int r2 = r * r;
-  for (auto dx : std::views::iota(-r, r + 1))
-    for (auto dy : std::views::iota(-r, r + 1))
-      for (auto dz : std::views::iota(-r, r + 1))
+  const int r = static_cast<int>(radius);
+  const int r2 = r * r;
+  for (int dx = -r; dx <= r; ++dx)
+    for (int dy = -r; dy <= r; ++dy)
+      for (int dz = -r; dz <= r; ++dz)
         if (dx * dx + dy * dy + dz * dz <= r2)
-          map[GlobalPosition{center.x + dx, center.y + dy, center.z + dz}] = 1;
+          map[GlobalPosition{center.x + dx, center.y + dy, center.z + dz}] =
+              value;
   return map;
 }
 
@@ -52,12 +55,11 @@ compute_bounds(layered_map<int> const &map) {
 }
 
 TEST_CASE("layered_map intersection sphere box") {
-  auto box = make_box(GlobalPosition{0, 0, 0}, 10, 10, 10);
-  auto sphere = make_sphere(GlobalPosition{5, 5, 5}, 3);
+  auto box = make_box(GlobalPosition{0, 0, 0}, GlobalPosition{20, 20, 20});
+  auto sphere = make_sphere(GlobalPosition{15, 10, 10}, 12);
 
-  CHECK(box.size() == 1000);
-  CHECK(sphere.size() == 123);
-  double expected_volume = 4.0 / 3.0 * std::numbers::pi * 27.0;
+  CHECK(box.size() == 8000);
+  double expected_volume = 4.0 / 3.0 * std::numbers::pi * 1728.0;
   CHECK(static_cast<double>(sphere.size()) ==
         doctest::Approx(expected_volume).epsilon(0.15));
 
@@ -66,16 +68,24 @@ TEST_CASE("layered_map intersection sphere box") {
       box, sphere, std::back_inserter(inter_vec),
       [](auto const &a, auto const &b) { return a.first < b.first; });
   auto inter = std::ranges::to<layered_map<int>>(inter_vec);
-  CHECK(static_cast<double>(inter.size()) ==
-        doctest::Approx(expected_volume).epsilon(0.15));
 
-  auto expected_bounds =
-      std::make_pair(GlobalPosition{2, 2, 2}, GlobalPosition{8, 8, 8});
+  layered_map<int> manual;
+  for (auto const &[pos, val] : sphere)
+    if (box.find(pos) != box.end())
+      manual[pos] = val;
+
+  CHECK(!manual.empty());
+  CHECK(manual.size() < sphere.size());
+  CHECK(inter.size() == manual.size());
+  CHECK(std::ranges::equal(inter, manual,
+                           [](auto const &a, auto const &b) {
+                             return a.first == b.first && a.second == b.second;
+                           }));
+
   auto bounds = compute_bounds(inter);
-  CHECK(inter.size() == sphere.size());
-  CHECK(bounds.first == expected_bounds.first);
-  CHECK(bounds.second == expected_bounds.second);
+  CHECK(bounds.first < bounds.second);
+  CHECK(bounds.second < GlobalPosition{20, 20, 20});
 
-    magica_voxel_writer writer("intersection");
-    writer.add_frame(inter);
+  magica_voxel_writer writer("intersection");
+  writer.add_frame(inter);
 }
