@@ -30,6 +30,7 @@ The `include` directory contains a number of specialized containers and helper u
 - **flyweight_map** – immutable deduplicating map assigning compact 32‑bit handles to values.
 - **flyweight_block_map** – fixed size associative container using `flyweight_map` internally.
 - **flyweight_mirror_block_map** – `flyweight_block_map` variant supporting mirrored orientations.
+- **dense_map** – fixed range map storing values densely with a bitset for keys.
 - **magica_voxel_io** – load and write MagicaVoxel `.vox` files.
 - **reverse_mirror** – strategy object used by the mirrored block map.
 - **arrow_proxy** – helper proxy enabling `iterator->` semantics for prvalue pairs.
