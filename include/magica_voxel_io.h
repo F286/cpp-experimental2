@@ -1,12 +1,18 @@
 #pragma once
 
 #include "flyweight_block_map.h"
+#include "positions.h"
 #include <fstream>
 #include <vector>
+#include <array>
 #include <string>
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <type_traits>
+#include <ranges>
+#include <iostream>
 
 /*
     Excerpt from the official MagicaVoxel 0.99.5 VOX specification
@@ -74,38 +80,84 @@ namespace magica_voxel_detail {
     };
 }
 
-/// @brief RAII writer for flyweight_block_map frames.
-template<typename Map>
+/// @brief RAII writer for map data.
 class magica_voxel_writer {
 public:
     /// @brief Open file for writing.
     explicit magica_voxel_writer(const std::string& path)
-        : out_(path, std::ios::binary)
+        : out_(path, std::ios::binary), path_(path)
     {
         if (!out_) throw std::runtime_error("cannot open output file");
     }
 
-    /// @brief Write frames to VOX file.
-    void write(const std::vector<Map>& frames)
+    /// @brief Write a single frame to a VOX file.
+    template<typename Map>
+    void write(const Map& frame)
     {
-        // total byte count of the children inside MAIN
-        uint32_t child_size = frames.size() > 1 ? 12 + 4 : 0; // PACK chunk
+        std::array<Map,1> tmp{frame};
+        write_frames(tmp);
+    }
 
-        std::vector<std::vector<std::array<uint8_t,4>>> voxel_data;
-        voxel_data.reserve(frames.size());
+    /// @brief Write a range of map frames to a VOX file.
+    template<std::ranges::input_range Range>
+        requires requires { typename std::remove_cvref_t<std::ranges::range_value_t<Range>>::key_type; }
+    void write_frames(Range frames)
+    {
+        using std::begin;
+        using std::end;
+        auto n = static_cast<uint32_t>(std::ranges::distance(frames));
+
+        // total byte count of the children inside MAIN
+        uint32_t child_size = n > 1 ? 12 + 4 : 0; // PACK chunk
+
+        struct frame_info {
+            std::array<uint32_t,3> size{};
+            std::vector<std::array<uint8_t,4>> voxels{};
+        };
+        std::vector<frame_info> voxel_data;
+        voxel_data.reserve(n);
 
         // convert maps into XYZI tuples and compute sizes
-        for (const auto& frame : frames) {
-            std::vector<std::array<uint8_t,4>> voxels;
-            for (std::size_t i = 0; i < Map::block_size; ++i) {
-                auto v = frame.at(static_cast<typename Map::key_type>(i));
-                if (v != 0)
-                    voxels.push_back({static_cast<uint8_t>(i), 0, 0,
-                                      static_cast<uint8_t>(v)});
+        for (auto& frame : frames) {
+            frame_info info;
+            using map_type = std::remove_cvref_t<decltype(frame)>;
+            using key_t = typename map_type::key_type;
+
+            if constexpr(std::integral<key_t>) {
+                info.size = {map_type::block_size, 1, 1};
+                for(std::size_t i = 0; i < map_type::block_size; ++i) {
+                    auto v = frame.at(static_cast<key_t>(i));
+                    if(v != 0)
+                        info.voxels.push_back(std::array<uint8_t,4>{
+                            static_cast<uint8_t>(i),0,0,static_cast<uint8_t>(v)});
+                }
+            } else {
+                GlobalPosition min{std::numeric_limits<uint32_t>::max(),
+                                   std::numeric_limits<uint32_t>::max(),
+                                   std::numeric_limits<uint32_t>::max()};
+                GlobalPosition max{0,0,0};
+                for(auto const& [pos,val] : frame) {
+                    min.x = std::min(min.x, pos.x);
+                    min.y = std::min(min.y, pos.y);
+                    min.z = std::min(min.z, pos.z);
+                    max.x = std::max(max.x, pos.x);
+                    max.y = std::max(max.y, pos.y);
+                    max.z = std::max(max.z, pos.z);
+                }
+                info.size = {max.x - min.x + 1, max.y - min.y + 1,
+                             max.z - min.z + 1};
+                for(auto const& [pos,val] : frame) {
+                    if(val != 0)
+                        info.voxels.push_back(std::array<uint8_t,4>{
+                            static_cast<uint8_t>(pos.x - min.x),
+                            static_cast<uint8_t>(pos.y - min.y),
+                            static_cast<uint8_t>(pos.z - min.z),
+                            static_cast<uint8_t>(val)});
+                }
             }
             child_size += 12 + 12;                   // SIZE chunk
-            child_size += 12 + 4 + voxels.size()*4;   // XYZI chunk
-            voxel_data.push_back(std::move(voxels));
+            child_size += 12 + 4 + info.voxels.size()*4; // XYZI chunk
+            voxel_data.push_back(std::move(info));
         }
         child_size += 12 + 1024; // RGBA palette
 
@@ -115,23 +167,23 @@ public:
         out_.write("MAIN",4);
         write_u32(0);           // no MAIN content
         write_u32(child_size);  // total size of children
-        if (frames.size() > 1) {
+        if (n > 1) {
             // number of models when more than one
             out_.write("PACK",4);
             write_u32(4);
             write_u32(0);
-            write_u32(static_cast<uint32_t>(frames.size()));
+            write_u32(static_cast<uint32_t>(n));
         }
-        for (std::size_t m=0;m<frames.size();++m) {
+        for (std::size_t m=0;m<voxel_data.size();++m) {
             // model dimensions (1D grid)
             out_.write("SIZE",4);
             write_u32(12);
             write_u32(0);
-            write_u32(static_cast<uint32_t>(Map::block_size));
-            write_u32(1);
-            write_u32(1);
+            write_u32(voxel_data[m].size[0]);
+            write_u32(voxel_data[m].size[1]);
+            write_u32(voxel_data[m].size[2]);
 
-            const auto& voxels = voxel_data[m];
+            const auto& voxels = voxel_data[m].voxels;
             out_.write("XYZI",4);
             write_u32(static_cast<uint32_t>(4 + voxels.size()*4));
             write_u32(0);
@@ -144,6 +196,8 @@ public:
         write_u32(0);
         for(uint32_t c : magica_voxel_detail::default_palette)
             write_u32(c);
+
+        std::cout << "file://" << path_ << "\n";
     }
 
     /// @brief Close file on destruction.
@@ -153,7 +207,10 @@ private:
     /// @brief Write a 32-bit integer.
     void write_u32(uint32_t v) { out_.write(reinterpret_cast<const char*>(&v),4); }
 
+    /// @brief Output file stream.
     std::ofstream out_{};
+    /// @brief Path written to.
+    std::string path_{};
 };
 
 /// @brief RAII reader for flyweight_block_map frames.
