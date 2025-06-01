@@ -4,9 +4,16 @@
 #include <cstddef>
 #include <numeric>
 #include <algorithm>
+#include <ranges>
 #include "arrow_proxy.h"
 
-/// @brief Variable resolution container storing SIMD tiles.
+/**
+ * @brief Variable resolution vector of SIMD tiles.
+ *
+ * Acts like `std::vector<simd<T>>` but stores optional higher
+ * resolution patches for selected ranges. Low variance patches can
+ * be merged into the base layer via `optimize`.
+ */
 template<typename Simd, std::size_t N>
     requires std::experimental::is_simd_v<Simd>
 class vector_mip {
@@ -52,19 +59,22 @@ public:
     /// @brief Current number of high resolution patches.
     size_type patch_count() const noexcept { return patches_.size(); }
 
+    /// @brief Insert patch covering sequential tiles.
+    template<std::ranges::input_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, simd_type>
+    void insert_patch(size_type start, R&& values);
+
     /// @brief Merge patches until at most max_patches remain.
     void optimize(size_type max_patches);
 
 private:
     struct patch {
-        /// @brief First tile index covered by the patch.
-        size_type start{};
-        /// @brief Number of SIMD tiles in the patch (power of two).
-        size_type tiles{};
-        /// @brief Values stored relative to the base layer.
-        std::vector<simd_type> data{};
         /// @brief True if tile index lies within patch range.
         bool contains(size_type i) const { return i >= start && i < start + tiles; }
+
+        size_type start{}; ///< @brief First tile index covered by the patch.
+        size_type tiles{}; ///< @brief Number of SIMD tiles in the patch (power of two).
+        std::vector<simd_type> data{}; ///< @brief Values stored relative to the base layer.
     };
 
     patch*      find_patch(size_type idx);
@@ -252,6 +262,24 @@ void vector_mip<Simd, N>::set(size_type idx, const simd_type& v) {
     np.data.resize(1);
     np.data[0] = v - base_[idx];
     patches_.push_back(std::move(np));
+}
+
+/// @brief Insert patch from absolute values.
+template<typename Simd, std::size_t N>
+    requires std::experimental::is_simd_v<Simd>
+template<std::ranges::input_range R>
+    requires std::same_as<std::ranges::range_value_t<R>, typename vector_mip<Simd, N>::simd_type>
+void vector_mip<Simd, N>::insert_patch(size_type start, R&& values) {
+    patch p;
+    p.start = start;
+    p.tiles = std::ranges::distance(values);
+    p.data.reserve(p.tiles);
+    size_type i = 0;
+    for (auto const& v : values) {
+        p.data.push_back(v - base_[start + i]);
+        ++i;
+    }
+    patches_.push_back(std::move(p));
 }
 
 /// @brief Compute mean of patch data.

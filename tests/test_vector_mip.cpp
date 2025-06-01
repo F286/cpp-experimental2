@@ -39,3 +39,19 @@ TEST_CASE("optimize patches") {
     CHECK(static_cast<std::experimental::simd<float>>(v[3])[0] == doctest::Approx(5.0f));
 }
 
+TEST_CASE("remove low variance region") {
+    using simd_t = std::experimental::simd<float>;
+    vector_mip<simd_t, 4> v;
+    v.insert_patch(0, std::vector<simd_t>{simd_t(1.0f), simd_t(1.0f)});
+    v.insert_patch(2, std::vector<simd_t>{simd_t(1.0f), simd_t(-1.0f)});
+    CHECK(v.patch_count() == 2);
+    std::array<simd_t,4> before{v[0], v[1], v[2], v[3]};
+    v.optimize(1);
+    CHECK(v.patch_count() == 1);
+    v[0] = simd_t(2.0f);
+    CHECK(v.patch_count() == 2);
+    CHECK(static_cast<simd_t>(v[0])[0] == doctest::Approx(2.0f));
+    for(std::size_t i = 1; i < 4; ++i)
+        CHECK(static_cast<simd_t>(v[i])[0] == doctest::Approx(before[i][0]));
+}
+
