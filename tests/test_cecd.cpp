@@ -51,6 +51,19 @@ static std::size_t intersection_size(layered_map<int> const& lhs,
     return count;
 }
 
+/// @brief Create hollow cube with cross braces.
+static layered_map<int> make_hollow_cross() {
+    auto outer = make_box(GlobalPosition{0,0,0}, GlobalPosition{20,20,20});
+    auto inner = make_box(GlobalPosition{4,4,4}, GlobalPosition{16,16,16});
+    for (auto const& [gp, v] : inner) outer.erase(gp);
+    for (std::uint32_t i = 4; i < 16; ++i) {
+        outer[GlobalPosition{i,10,10}] = 1;
+        outer[GlobalPosition{10,i,10}] = 1;
+        outer[GlobalPosition{10,10,i}] = 1;
+    }
+    return outer;
+}
+
 TEST_CASE("extrude and inset operations") {
     auto box = make_box(GlobalPosition{0,0,0}, GlobalPosition{3,3,3});
     auto inner = inset(box);
@@ -74,5 +87,16 @@ TEST_CASE("CECD accuracy synthetic") {
                      static_cast<double>(shape.size());
         CHECK(acc >= 0.95);
     }
+}
+
+TEST_CASE("CECD complex hollow cross") {
+    auto shape = make_hollow_cross();
+    auto layers = core_expanding_convex_decomposition(shape);
+    layered_map<int> merged;
+    for (auto const& layer : layers)
+        for (auto it = layer.cbegin(); it != layer.cend(); ++it)
+            merged.insert({it->first, it->second});
+    CHECK(merged.size() == shape.size());
+    CHECK(intersection_size(shape, merged) == shape.size());
 }
 

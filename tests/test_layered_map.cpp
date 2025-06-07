@@ -1,6 +1,8 @@
 #include "doctest.h"
 #include "layered_map.h"
 #include "positions.h"
+#include "layered_map_algo.h"
+#include "aabb.h"
 #include <string>
 #include <vector>
 #include <ranges>
@@ -18,6 +20,17 @@ namespace checks {
     static_assert(std::ranges::common_range<map_t>);
     static_assert(std::same_as<std::ranges::range_value_t<map_t>,
                                std::pair<GlobalPosition, std::string>>);
+}
+
+/// @brief Create axis aligned box filled with a value.
+static layered_map<int> make_box(GlobalPosition min_corner,
+                                 GlobalPosition max_corner,
+                                 int value = 1)
+{
+    layered_map<int> map;
+    for (GlobalPosition p : GlobalAabb{min_corner, max_corner})
+        map[p] = value;
+    return map;
 }
 
 TEST_CASE("layered_map basic insertion") {
@@ -67,5 +80,41 @@ TEST_CASE("layered_map insert method") {
     CHECK(!ok2);
     CHECK(it2 == it1);
     CHECK(it2->second == 7);
+}
+
+TEST_CASE("layered_map csg operations") {
+    auto lhs = make_box(GlobalPosition{0,0,0}, GlobalPosition{3,3,3});
+    auto rhs = make_box(GlobalPosition{2,2,2}, GlobalPosition{5,5,5});
+
+    layered_map<int> manual_union = lhs;
+    for (auto const& [gp, v] : rhs)
+        manual_union.insert({gp, v});
+
+    auto uop = lhs | rhs;
+    CHECK(uop.size() == manual_union.size());
+
+    layered_map<int> manual_inter;
+    set_intersection(lhs, rhs,
+                    std::inserter(manual_inter, manual_inter.end()));
+
+    auto oop = lhs & rhs;
+    CHECK(oop.size() == manual_inter.size());
+
+    auto diff = lhs - rhs;
+    for (auto const& [gp, v] : diff)
+        CHECK(rhs.find(gp) == rhs.end());
+
+    auto tmp = lhs;
+    tmp |= rhs;
+    CHECK(tmp.size() == manual_union.size());
+
+    tmp = lhs;
+    tmp &= rhs;
+    CHECK(tmp.size() == manual_inter.size());
+
+    tmp = lhs;
+    tmp -= rhs;
+    for (auto const& [gp, v] : tmp)
+        CHECK(rhs.find(gp) == rhs.end());
 }
 
