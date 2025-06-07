@@ -33,6 +33,85 @@ OutIt set_intersection(const layered_map<T>& lhs,
     return out;
 }
 
+/// @brief Combine voxels from both maps.
+template<typename T>
+layered_map<T> merge(layered_map<T> lhs, const layered_map<T>& rhs)
+{
+    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
+        lhs.insert({it->first, it->second});
+    return lhs;
+}
+
+/// @brief Voxels present in both maps.
+template<typename T>
+layered_map<T> overlap(layered_map<T> const& lhs, layered_map<T> const& rhs)
+{
+    layered_map<T> out;
+    chunk_map<T, bucket_map<LocalPosition, T>>::for_each_intersection(
+        lhs, rhs,
+        [&](GlobalPosition gp, const T& val)
+        {
+            out.insert({gp, val});
+        });
+    return out;
+}
+
+/// @brief Remove rhs voxels from lhs.
+template<typename T>
+layered_map<T> subtract(layered_map<T> lhs, const layered_map<T>& rhs)
+{
+    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
+        lhs.erase(it->first);
+    return lhs;
+}
+
+/// @brief Union operator shorthand.
+template<typename T>
+layered_map<T> operator|(layered_map<T> lhs, const layered_map<T>& rhs)
+{
+    return merge(std::move(lhs), rhs);
+}
+
+/// @brief In-place union assignment.
+template<typename T>
+layered_map<T>& operator|=(layered_map<T>& lhs, const layered_map<T>& rhs)
+{
+    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
+        lhs.insert({it->first, it->second});
+    return lhs;
+}
+
+/// @brief Intersection operator shorthand.
+template<typename T>
+layered_map<T> operator&(layered_map<T> lhs, const layered_map<T>& rhs)
+{
+    return overlap(lhs, rhs);
+}
+
+/// @brief In-place intersection assignment.
+template<typename T>
+layered_map<T>& operator&=(layered_map<T>& lhs, const layered_map<T>& rhs)
+{
+    lhs = overlap(lhs, rhs);
+    return lhs;
+}
+
+/// @brief Difference operator shorthand.
+template<typename T>
+layered_map<T> operator-(layered_map<T> lhs, const layered_map<T>& rhs)
+{
+    return subtract(std::move(lhs), rhs);
+}
+
+/// @brief In-place difference assignment.
+template<typename T>
+layered_map<T>& operator-=(layered_map<T>& lhs, const layered_map<T>& rhs)
+{
+    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
+        lhs.erase(it->first);
+    return lhs;
+}
+
 /// @brief Add offset to a position clamping at zero.
 inline bool offset(GlobalPosition p, int dx, int dy, int dz, GlobalPosition& out)
 {

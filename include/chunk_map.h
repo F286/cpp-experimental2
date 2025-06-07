@@ -154,7 +154,7 @@ public:
         if (itChunk == chunks_.end()) return 0;
         auto itLocal = itChunk->second.find(lp);
         if (itLocal == itChunk->second.end()) return 0;
-        itChunk->second.erase(itLocal);
+        itChunk->second.erase(lp);
         if (itChunk->second.empty()) {
             chunks_.erase(itChunk);
         }
