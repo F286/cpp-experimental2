@@ -133,7 +133,7 @@ TEST_CASE("ranges to move map") {
     CHECK(src.empty());
 }
 
-TEST_CASE("optimized set_intersection") {
+TEST_CASE("optimized overlap view") {
     bucket_map<std::size_t, int> lhs;
     lhs.insert_or_assign(1, 1);
     lhs.insert_or_assign(5, 2);
@@ -143,10 +143,49 @@ TEST_CASE("optimized set_intersection") {
     rhs.insert_or_assign(5, 8);
     rhs.insert_or_assign(70, 9);
 
-    std::vector<std::pair<std::size_t, int>> inter;
-    set_intersection(lhs, rhs, std::back_inserter(inter));
+    auto inter = std::ranges::to<std::vector<std::pair<std::size_t, int>>>(
+        lhs | bucket_map<std::size_t, int>::overlap(rhs));
 
     std::vector<std::pair<std::size_t, int>> expected{{5, 2}, {70, 3}};
     CHECK(inter == expected);
+}
+
+TEST_CASE("optimized subtract view") {
+    bucket_map<std::size_t, int> lhs;
+    lhs.insert_or_assign(1, 1);
+    lhs.insert_or_assign(5, 2);
+    lhs.insert_or_assign(70, 3);
+    bucket_map<std::size_t, int> rhs;
+    rhs.insert_or_assign(5, 8);
+    rhs.insert_or_assign(80, 9);
+    auto diff = std::ranges::to<std::vector<std::pair<std::size_t, int>>>(
+        lhs | bucket_map<std::size_t, int>::subtract(rhs));
+    std::vector<std::pair<std::size_t, int>> expected{{1,1},{70,3}};
+    CHECK(diff == expected);
+}
+
+TEST_CASE("optimized merge view") {
+    bucket_map<std::size_t, int> lhs;
+    lhs.insert_or_assign(1, 1);
+    bucket_map<std::size_t, int> rhs;
+    rhs.insert_or_assign(0, 7);
+    rhs.insert_or_assign(1, 5);
+    auto uni = std::ranges::to<std::vector<std::pair<std::size_t, int>>>(
+        lhs | bucket_map<std::size_t, int>::merge(rhs));
+    std::vector<std::pair<std::size_t, int>> expected{{0,7},{1,1}};
+    CHECK(uni == expected);
+}
+
+TEST_CASE("optimized exclusive view") {
+    bucket_map<std::size_t, int> lhs;
+    lhs.insert_or_assign(1, 1);
+    lhs.insert_or_assign(5, 2);
+    bucket_map<std::size_t, int> rhs;
+    rhs.insert_or_assign(5, 8);
+    rhs.insert_or_assign(9, 9);
+    auto sym = std::ranges::to<std::vector<std::pair<std::size_t, int>>>(
+        lhs | bucket_map<std::size_t, int>::exclusive(rhs));
+    std::vector<std::pair<std::size_t, int>> expected{{1,1},{9,9}};
+    CHECK(sym == expected);
 }
 
