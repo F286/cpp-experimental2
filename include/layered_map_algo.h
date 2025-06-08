@@ -24,12 +24,8 @@ OutIt set_intersection(const layered_map<T>& lhs,
                        const layered_map<T>& rhs,
                        OutIt out)
 {
-    chunk_map<T, bucket_map<LocalPosition, T>>::for_each_intersection(
-        lhs, rhs,
-        [&](GlobalPosition gp, const T& val)
-        {
-            *out++ = std::pair{gp, val};
-        });
+    for (auto&& e : lhs | chunk_map<T, bucket_map<LocalPosition, T>>::overlap(rhs))
+        *out++ = e;
     return out;
 }
 
@@ -47,12 +43,8 @@ template<typename T>
 layered_map<T> overlap(layered_map<T> const& lhs, layered_map<T> const& rhs)
 {
     layered_map<T> out;
-    chunk_map<T, bucket_map<LocalPosition, T>>::for_each_intersection(
-        lhs, rhs,
-        [&](GlobalPosition gp, const T& val)
-        {
-            out.insert({gp, val});
-        });
+    for (auto&& e : lhs | chunk_map<T, bucket_map<LocalPosition, T>>::overlap(rhs))
+        out.insert(e);
     return out;
 }
 

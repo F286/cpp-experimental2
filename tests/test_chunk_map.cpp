@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "chunk_map.h"
+#include "bucket_map.h"
 #include <vector>
 #include <algorithm>
 #include <string>
@@ -79,6 +80,47 @@ TEST_CASE("set_intersection on full pairs") {
     REQUIRE(inter.size() == 2);
     CHECK(inter[0].first == GlobalPosition{2});
     CHECK(inter[1].first == GlobalPosition{45});
+}
+
+TEST_CASE("optimized chunk_map subtract view") {
+    chunk_map<int> lhs;
+    lhs[GlobalPosition{1,0,0}] = 1;
+    lhs[GlobalPosition{5,0,0}] = 2;
+    chunk_map<int> rhs;
+    rhs[GlobalPosition{5,0,0}] = 8;
+    auto diff = std::ranges::to<std::vector<std::pair<GlobalPosition, int>>>(
+        lhs | chunk_map<int>::subtract(rhs));
+    std::vector<std::pair<GlobalPosition, int>> expected{{GlobalPosition{1,0,0},1}};
+    CHECK(diff == expected);
+}
+
+TEST_CASE("optimized chunk_map merge view") {
+    chunk_map<int> lhs;
+    lhs[GlobalPosition{1,0,0}] = 1;
+    chunk_map<int> rhs;
+    rhs[GlobalPosition{2,0,0}] = 3;
+    rhs[GlobalPosition{1,0,0}] = 4;
+    auto uni = std::ranges::to<std::vector<std::pair<GlobalPosition, int>>>(
+        lhs | chunk_map<int>::merge(rhs));
+    std::vector<std::pair<GlobalPosition, int>> expected{
+        {GlobalPosition{1,0,0},1}, {GlobalPosition{2,0,0},3}
+    };
+    CHECK(uni == expected);
+}
+
+TEST_CASE("optimized chunk_map exclusive view") {
+    chunk_map<int> lhs;
+    lhs[GlobalPosition{1,0,0}] = 1;
+    lhs[GlobalPosition{4,0,0}] = 2;
+    chunk_map<int> rhs;
+    rhs[GlobalPosition{4,0,0}] = 5;
+    rhs[GlobalPosition{8,0,0}] = 6;
+    auto sym = std::ranges::to<std::vector<std::pair<GlobalPosition, int>>>(
+        lhs | chunk_map<int>::exclusive(rhs));
+    std::vector<std::pair<GlobalPosition, int>> expected{
+        {GlobalPosition{1,0,0},1}, {GlobalPosition{8,0,0},6}
+    };
+    CHECK(sym == expected);
 }
 
 TEST_CASE("ranges to from vector for chunk_map") {

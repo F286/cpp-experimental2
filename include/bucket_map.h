@@ -8,6 +8,7 @@
 #include <bit>
 #include "arrow_proxy.h"
 #include "flat_vector_array_packed.h"
+#include "set_views.h"
 
 /// @brief Map storing values in deduplicated buckets.
 template<typename Key, typename T, typename Bucket = std::uint64_t>
@@ -357,11 +358,26 @@ class const_iterator {
     /// @brief View lazily describing stored nodes.
     nodes_view nodes() const { return nodes_view(this); }
 
-    /// @brief Call functor for each entry present in both maps.
-    template<typename Fn>
-    static void for_each_intersection(const bucket_map& lhs,
-                                      const bucket_map& rhs,
-                                      Fn&& fn);
+
+    /// @brief Lazy overlap view of two maps.
+    static auto overlap(const bucket_map& lhs, const bucket_map& rhs);
+    /// @brief Overlap adaptor for piping.
+    static auto overlap(const bucket_map& rhs);
+
+    /// @brief Lazy subtraction view of two maps.
+    static auto subtract(const bucket_map& lhs, const bucket_map& rhs);
+    /// @brief Subtract adaptor for piping.
+    static auto subtract(const bucket_map& rhs);
+
+    /// @brief Lazy merge view of two maps.
+    static auto merge(const bucket_map& lhs, const bucket_map& rhs);
+    /// @brief Merge adaptor for piping.
+    static auto merge(const bucket_map& rhs);
+
+    /// @brief Lazy exclusive view of two maps.
+    static auto exclusive(const bucket_map& lhs, const bucket_map& rhs);
+    /// @brief Exclusive adaptor for piping.
+    static auto exclusive(const bucket_map& rhs);
 
     /// @brief Bit mask of occupied entries in a bucket array.
     static Bucket mask_of(const bucket_array& arr);
@@ -428,22 +444,63 @@ static void for_each_set_bit(Bucket mask, Fn&& fn)
 }
 
 template<typename Key, typename T, typename Bucket>
-template<typename Fn>
-void bucket_map<Key, T, Bucket>::for_each_intersection(const bucket_map& lhs,
-                                                       const bucket_map& rhs,
-                                                       Fn&& fn)
+auto bucket_map<Key, T, Bucket>::overlap(const bucket_map& lhs,
+                                         const bucket_map& rhs)
 {
-    size_type max_b = std::min(lhs.buckets_.size(), rhs.buckets_.size());
-    for (size_type b = 0; b < max_b; ++b) {
-        auto arr_l = lhs.buckets_[b];
-        auto arr_r = rhs.buckets_[b];
-        Bucket mask = bucket_map<Key, T, Bucket>::mask_of(arr_l)
-                    & bucket_map<Key, T, Bucket>::mask_of(arr_r);
-        for_each_set_bit(mask, [&](size_type bit) {
-            Key key{static_cast<std::uint32_t>(b * bits_ + bit)};
-            fn(key, lhs.values_[arr_l[bit]]);
-        });
-    }
+    return views::overlap(lhs, rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::overlap(const bucket_map& rhs)
+{
+    return views::overlap(rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::subtract(const bucket_map& lhs,
+                                          const bucket_map& rhs)
+{
+    return views::subtract(lhs, rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::subtract(const bucket_map& rhs)
+{
+    return views::subtract(rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::merge(const bucket_map& lhs,
+                                       const bucket_map& rhs)
+{
+    return views::merge(lhs, rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::merge(const bucket_map& rhs)
+{
+    return views::merge(rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::exclusive(const bucket_map& lhs,
+                                           const bucket_map& rhs)
+{
+    return views::exclusive(lhs, rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
+}
+
+template<typename Key, typename T, typename Bucket>
+auto bucket_map<Key, T, Bucket>::exclusive(const bucket_map& rhs)
+{
+    return views::exclusive(rhs,
+        [](auto const& a, auto const& b) { return a.first < b.first; });
 }
 
 /// @brief Write entries present in both maps to output iterator.
@@ -452,8 +509,41 @@ OutIt set_intersection(const bucket_map<Key, T, Bucket>& lhs,
                        const bucket_map<Key, T, Bucket>& rhs,
                        OutIt out)
 {
-    bucket_map<Key, T, Bucket>::for_each_intersection(lhs, rhs,
-        [&](Key k, const T& v) { *out++ = std::pair{k, v}; });
+    for (auto&& e : bucket_map<Key, T, Bucket>::overlap(lhs, rhs))
+        *out++ = e;
+    return out;
+}
+
+/// @brief Write entries present in lhs but not rhs to output iterator.
+template<typename Key, typename T, typename Bucket, typename OutIt>
+OutIt set_difference(const bucket_map<Key, T, Bucket>& lhs,
+                     const bucket_map<Key, T, Bucket>& rhs,
+                     OutIt out)
+{
+    for (auto&& e : bucket_map<Key, T, Bucket>::subtract(lhs, rhs))
+        *out++ = e;
+    return out;
+}
+
+/// @brief Write all unique entries from both maps to output iterator.
+template<typename Key, typename T, typename Bucket, typename OutIt>
+OutIt set_union(const bucket_map<Key, T, Bucket>& lhs,
+                const bucket_map<Key, T, Bucket>& rhs,
+                OutIt out)
+{
+    for (auto&& e : bucket_map<Key, T, Bucket>::merge(lhs, rhs))
+        *out++ = e;
+    return out;
+}
+
+/// @brief Write elements present in exactly one of the maps.
+template<typename Key, typename T, typename Bucket, typename OutIt>
+OutIt set_symmetric_difference(const bucket_map<Key, T, Bucket>& lhs,
+                               const bucket_map<Key, T, Bucket>& rhs,
+                               OutIt out)
+{
+    for (auto&& e : bucket_map<Key, T, Bucket>::exclusive(lhs, rhs))
+        *out++ = e;
     return out;
 }
 
@@ -465,8 +555,17 @@ namespace std::ranges {
             C out;
             out.insert_range(std::forward<R>(r));
             return out;
+        } else if constexpr (requires { C(std::ranges::begin(r), std::ranges::end(r)); }) {
+            return C(std::ranges::begin(r), std::ranges::end(r));
         } else {
-            return C(std::forward<R>(r));
+            C out;
+            for (auto&& e : r) {
+                if constexpr (requires { out.push_back(std::forward<decltype(e)>(e)); })
+                    out.push_back(std::forward<decltype(e)>(e));
+                else
+                    out.insert(out.end(), std::forward<decltype(e)>(e));
+            }
+            return out;
         }
     }
 }
