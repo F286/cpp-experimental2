@@ -2,6 +2,7 @@
 #include "layered_map.h"
 #include <map>
 #include <array>
+#include <ranges>
 
 /**
  * @brief Core expanding convex decomposition utilities.
@@ -31,11 +32,10 @@ OutIt set_intersection(const layered_map<T>& lhs,
 
 /// @brief Combine voxels from both maps.
 template<typename T>
-layered_map<T> merge(layered_map<T> lhs, const layered_map<T>& rhs)
+layered_map<T> merge(const layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
-        lhs.insert({it->first, it->second});
-    return lhs;
+    auto view = chunk_map<T, bucket_map<LocalPosition, T>>::merge(lhs, rhs);
+    return std::ranges::to<layered_map<T>>(view);
 }
 
 /// @brief Voxels present in both maps.
@@ -50,32 +50,30 @@ layered_map<T> overlap(layered_map<T> const& lhs, layered_map<T> const& rhs)
 
 /// @brief Remove rhs voxels from lhs.
 template<typename T>
-layered_map<T> subtract(layered_map<T> lhs, const layered_map<T>& rhs)
+layered_map<T> subtract(const layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
-        lhs.erase(it->first);
-    return lhs;
+    auto view = chunk_map<T, bucket_map<LocalPosition, T>>::subtract(lhs, rhs);
+    return std::ranges::to<layered_map<T>>(view);
 }
 
 /// @brief Union operator shorthand.
 template<typename T>
-layered_map<T> operator|(layered_map<T> lhs, const layered_map<T>& rhs)
+layered_map<T> operator|(const layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    return merge(std::move(lhs), rhs);
+    return merge(lhs, rhs);
 }
 
 /// @brief In-place union assignment.
 template<typename T>
 layered_map<T>& operator|=(layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
-        lhs.insert({it->first, it->second});
+    lhs = merge(lhs, rhs);
     return lhs;
 }
 
 /// @brief Intersection operator shorthand.
 template<typename T>
-layered_map<T> operator&(layered_map<T> lhs, const layered_map<T>& rhs)
+layered_map<T> operator&(const layered_map<T>& lhs, const layered_map<T>& rhs)
 {
     return overlap(lhs, rhs);
 }
@@ -90,17 +88,16 @@ layered_map<T>& operator&=(layered_map<T>& lhs, const layered_map<T>& rhs)
 
 /// @brief Difference operator shorthand.
 template<typename T>
-layered_map<T> operator-(layered_map<T> lhs, const layered_map<T>& rhs)
+layered_map<T> operator-(const layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    return subtract(std::move(lhs), rhs);
+    return subtract(lhs, rhs);
 }
 
 /// @brief In-place difference assignment.
 template<typename T>
 layered_map<T>& operator-=(layered_map<T>& lhs, const layered_map<T>& rhs)
 {
-    for (auto it = rhs.cbegin(); it != rhs.cend(); ++it)
-        lhs.erase(it->first);
+    lhs = subtract(lhs, rhs);
     return lhs;
 }
 
